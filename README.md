@@ -1,3 +1,5 @@
-Experimentation project
+Translating Haskell code to Gallina
+===================================
 
-Something to do with dependently typed programming...
+Hs2Gallina is a tool to assist in translating Haskell programs to Coq
+programs.
