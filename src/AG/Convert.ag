@@ -1,0 +1,6 @@
+attr Module
+  syn gallina :: {String}
+                 
+sem Module                 
+  | Module lhs.gallina = "hoi"
+

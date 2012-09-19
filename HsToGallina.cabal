@@ -1,0 +1,16 @@
+name: HsToGallina
+version: 0.0.1
+synopsis: Convert Haskell code to Gallina code.
+author: Gabe Dijkstra
+maintainer: G.Dijkstra@uu.nl
+build-type: Simple
+cabal-version: >= 1.2
+extra-source-files: Makefile, README.md
+
+executable HsToGallina
+  main-is: HsToGallina.hs
+  ghc-options: -Wall
+  build-depends: base
+                 , uuagc
+                 , haskell-src-exts
+  hs-source-dirs: src

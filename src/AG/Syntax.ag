@@ -1,0 +1,582 @@
+data ModuleName
+	| ModuleName	 string :: String
+
+deriving ModuleName : Eq, Ord, Show, Typeable, Data
+
+
+data SpecialCon
+	| UnitCon	 
+	| ListCon	 
+	| FunCon	 
+	| TupleCon	 boxed :: Boxed int :: Int
+	| Cons	 
+	| UnboxedSingleCon	 
+
+deriving SpecialCon : Eq, Ord, Show, Typeable, Data
+
+
+data QName
+	| Qual	 modulename :: ModuleName name :: Name
+	| UnQual	 name :: Name
+	| Special	 specialcon :: SpecialCon
+
+deriving QName : Eq, Ord, Show, Typeable, Data
+
+
+data Name
+	| Ident	 string :: String
+	| Symbol	 string :: String
+
+deriving Name : Eq, Ord, Show, Typeable, Data
+
+
+data IPName
+	| IPDup	 string :: String
+	| IPLin	 string :: String
+
+deriving IPName : Eq, Ord, Show, Typeable, Data
+
+
+data QOp
+	| QVarOp	 qname :: QName
+	| QConOp	 qname :: QName
+
+deriving QOp : Eq, Ord, Show, Typeable, Data
+
+
+data Op
+	| VarOp	 name :: Name
+	| ConOp	 name :: Name
+
+deriving Op : Eq, Ord, Show, Typeable, Data
+
+
+data CName
+	| VarName	 name :: Name
+	| ConName	 name :: Name
+
+deriving CName : Eq, Ord, Show, Typeable, Data
+
+
+data Module
+	| Module	 srcloc :: SrcLoc modulename :: ModuleName modulepragmas :: ModulePragmas warningtextopt :: WarningTextOpt exportspecsopt :: ExportSpecsOpt importdecls :: ImportDecls decls :: Decls
+
+deriving Module : Eq, Ord, Show, Typeable, Data
+
+
+data ExportSpec
+	| EVar	 qname :: QName
+	| EAbs	 qname :: QName
+	| EThingAll	 qname :: QName
+	| EThingWith	 qname :: QName cnames :: CNames
+	| EModuleContents	 modulename :: ModuleName
+
+deriving ExportSpec : Eq, Ord, Show, Typeable, Data
+
+
+data ImportDecl
+	| ImportDecl	 importLoc :: SrcLoc importModule :: ModuleName importQualified :: Bool importSrc :: Bool importPkg :: StringOpt importAs :: ModuleNameOpt importSpecs :: ImportSpecsOpt
+
+deriving ImportDecl : Eq, Ord, Show, Typeable, Data
+
+
+data ImportSpec
+	| IVar	 name :: Name
+	| IAbs	 name :: Name
+	| IThingAll	 name :: Name
+	| IThingWith	 name :: Name cnames :: CNames
+
+deriving ImportSpec : Eq, Ord, Show, Typeable, Data
+
+
+data Assoc
+	| AssocNone	 
+	| AssocLeft	 
+	| AssocRight	 
+
+deriving Assoc : Eq, Ord, Show, Typeable, Data
+
+
+data Decl
+	| TypeDecl	 srcloc :: SrcLoc name :: Name tyvarbinds :: TyVarBinds ty :: Type
+	| TypeFamDecl	 srcloc :: SrcLoc name :: Name tyvarbinds :: TyVarBinds kindopt :: KindOpt
+	| DataDecl	 srcloc :: SrcLoc dataornew :: DataOrNew context :: Context name :: Name tyvarbinds :: TyVarBinds qualcondecls :: QualConDecls derivings :: Derivings
+	| GDataDecl	 srcloc :: SrcLoc dataornew :: DataOrNew context :: Context name :: Name tyvarbinds :: TyVarBinds kindopt :: KindOpt gadtdecls :: GadtDecls derivings :: Derivings
+	| DataFamDecl	 srcloc :: SrcLoc context :: Context name :: Name tyvarbinds :: TyVarBinds kindopt :: KindOpt
+	| TypeInsDecl	 srcloc :: SrcLoc ty :: Type ty1 :: Type
+	| DataInsDecl	 srcloc :: SrcLoc dataornew :: DataOrNew ty :: Type qualcondecls :: QualConDecls derivings :: Derivings
+	| GDataInsDecl	 srcloc :: SrcLoc dataornew :: DataOrNew ty :: Type kindopt :: KindOpt gadtdecls :: GadtDecls derivings :: Derivings
+	| ClassDecl	 srcloc :: SrcLoc context :: Context name :: Name tyvarbinds :: TyVarBinds fundeps :: FunDeps classdecls :: ClassDecls
+	| InstDecl	 srcloc :: SrcLoc context :: Context qname :: QName types :: Types instdecls :: InstDecls
+	| DerivDecl	 srcloc :: SrcLoc context :: Context qname :: QName types :: Types
+	| InfixDecl	 srcloc :: SrcLoc assoc :: Assoc int :: Int ops :: Ops
+	| DefaultDecl	 srcloc :: SrcLoc types :: Types
+	| SpliceDecl	 srcloc :: SrcLoc exp :: Exp
+	| TypeSig	 srcloc :: SrcLoc names :: Names ty :: Type
+	| FunBind	 matchs :: Matchs
+	| PatBind	 srcloc :: SrcLoc pat :: Pat typeopt :: TypeOpt rhs :: Rhs binds :: Binds
+	| ForImp	 srcloc :: SrcLoc callconv :: CallConv safety :: Safety string :: String name :: Name ty :: Type
+	| ForExp	 srcloc :: SrcLoc callconv :: CallConv string :: String name :: Name ty :: Type
+	| RulePragmaDecl	 srcloc :: SrcLoc rules :: Rules
+	| DeprPragmaDecl	 srcloc :: SrcLoc pragmaContent :: {[([Name], String)]}
+	| WarnPragmaDecl	 srcloc :: SrcLoc pragmaContent :: {[([Name], String)]}
+	| InlineSig	 srcloc :: SrcLoc bool :: Bool activation :: Activation qname :: QName
+	| InlineConlikeSig	 srcloc :: SrcLoc activation :: Activation qname :: QName
+	| SpecSig	 srcloc :: SrcLoc qname :: QName types :: Types
+	| SpecInlineSig	 srcloc :: SrcLoc bool :: Bool activation :: Activation qname :: QName types :: Types
+	| InstSig	 srcloc :: SrcLoc context :: Context qname :: QName types :: Types
+	| AnnPragma	 srcloc :: SrcLoc annotation :: Annotation
+
+deriving Decl : Eq, Ord, Show, Typeable, Data
+
+
+data Annotation
+	| Ann	 name :: Name exp :: Exp
+	| TypeAnn	 name :: Name exp :: Exp
+	| ModuleAnn	 exp :: Exp
+
+deriving Annotation : Eq, Ord, Show, Typeable, Data
+
+
+data DataOrNew
+	| DataType	 
+	| NewType	 
+
+deriving DataOrNew : Eq, Ord, Show, Typeable, Data
+
+
+data Binds
+	| BDecls	 decls :: Decls
+	| IPBinds	 ipbinds :: IPBinds
+
+deriving Binds : Eq, Ord, Show, Typeable, Data
+
+
+data IPBind
+	| IPBind	 srcloc :: SrcLoc ipname :: IPName exp :: Exp
+
+deriving IPBind : Eq, Ord, Show, Typeable, Data
+
+
+data Match
+	| Match	 srcloc :: SrcLoc name :: Name pats :: Pats typeopt :: TypeOpt rhs :: Rhs binds :: Binds
+
+deriving Match : Eq, Ord, Show, Typeable, Data
+
+
+data QualConDecl
+	| QualConDecl	 srcloc :: SrcLoc tyvarbinds :: TyVarBinds context :: Context condecl :: ConDecl
+
+deriving QualConDecl : Eq, Ord, Show, Typeable, Data
+
+
+data ConDecl
+	| ConDecl	 name :: Name bangtypes :: BangTypes
+	| InfixConDecl	 bangty :: BangType name :: Name bangty1 :: BangType
+	| RecDecl	 name :: Name fields :: {[([Name], BangType)]}
+
+deriving ConDecl : Eq, Ord, Show, Typeable, Data
+
+
+data GadtDecl
+	| GadtDecl	 srcloc :: SrcLoc name :: Name ty :: Type
+
+deriving GadtDecl : Eq, Ord, Show, Typeable, Data
+
+
+data ClassDecl
+	| ClsDecl	 decl :: Decl
+	| ClsDataFam	 srcloc :: SrcLoc context :: Context name :: Name tyvarbinds :: TyVarBinds kindopt :: KindOpt
+	| ClsTyFam	 srcloc :: SrcLoc name :: Name tyvarbinds :: TyVarBinds kindopt :: KindOpt
+	| ClsTyDef	 srcloc :: SrcLoc ty :: Type ty1 :: Type
+
+deriving ClassDecl : Eq, Ord, Show, Typeable, Data
+
+
+data InstDecl
+	| InsDecl	 decl :: Decl
+	| InsType	 srcloc :: SrcLoc ty :: Type ty1 :: Type
+	| InsData	 srcloc :: SrcLoc dataornew :: DataOrNew ty :: Type qualcondecls :: QualConDecls derivings :: Derivings
+	| InsGData	 srcloc :: SrcLoc dataornew :: DataOrNew ty :: Type kindopt :: KindOpt gadtdecls :: GadtDecls derivings :: Derivings
+
+deriving InstDecl : Eq, Ord, Show, Typeable, Data
+
+
+data BangType
+	| BangedTy	 ty :: Type
+	| UnBangedTy	 ty :: Type
+	| UnpackedTy	 ty :: Type
+
+deriving BangType : Eq, Ord, Show, Typeable, Data
+
+
+data Rhs
+	| UnGuardedRhs	 exp :: Exp
+	| GuardedRhss	 guardedrhss :: GuardedRhss
+
+deriving Rhs : Eq, Ord, Show, Typeable, Data
+
+
+data GuardedRhs
+	| GuardedRhs	 srcloc :: SrcLoc stmts :: Stmts exp :: Exp
+
+deriving GuardedRhs : Eq, Ord, Show, Typeable, Data
+
+
+data Type
+	| TyForall	 tyvarbindsopt :: TyVarBindsOpt context :: Context ty :: Type
+	| TyFun	 ty :: Type ty1 :: Type
+	| TyTuple	 boxed :: Boxed types :: Types
+	| TyList	 ty :: Type
+	| TyApp	 ty :: Type ty1 :: Type
+	| TyVar	 name :: Name
+	| TyCon	 qname :: QName
+	| TyParen	 ty :: Type
+	| TyInfix	 ty :: Type qname :: QName ty1 :: Type
+	| TyKind	 ty :: Type kind :: Kind
+
+deriving Type : Eq, Ord, Show, Typeable, Data
+
+
+data TyVarBind
+	| KindedVar	 name :: Name kind :: Kind
+	| UnkindedVar	 name :: Name
+
+deriving TyVarBind : Eq, Ord, Show, Typeable, Data
+
+
+data Kind
+	| KindStar	 
+	| KindBang	 
+	| KindFn	 kind :: Kind kind1 :: Kind
+	| KindParen	 kind :: Kind
+	| KindVar	 name :: Name
+
+deriving Kind : Eq, Ord, Show, Typeable, Data
+
+
+data FunDep
+	| FunDep	 names :: Names names1 :: Names
+
+deriving FunDep : Eq, Ord, Show, Typeable, Data
+
+
+data Asst
+	| ClassA	 qname :: QName types :: Types
+	| InfixA	 ty :: Type qname :: QName ty1 :: Type
+	| IParam	 ipname :: IPName ty :: Type
+	| EqualP	 ty :: Type ty1 :: Type
+
+deriving Asst : Eq, Ord, Show, Typeable, Data
+
+
+data Literal
+	| Char	 char :: Char
+	| String	 string :: String
+	| Int	 integer :: Integer
+	| Frac	 rational :: Rational
+	| PrimInt	 integer :: Integer
+	| PrimWord	 integer :: Integer
+	| PrimFloat	 rational :: Rational
+	| PrimDouble	 rational :: Rational
+	| PrimChar	 char :: Char
+	| PrimString	 string :: String
+
+deriving Literal : Eq, Ord, Show, Typeable, Data
+
+
+data Exp
+	| Var	 qname :: QName
+	| IPVar	 ipname :: IPName
+	| Con	 qname :: QName
+	| Lit	 literal :: Literal
+	| InfixApp	 exp :: Exp qop :: QOp exp1 :: Exp
+	| App	 exp :: Exp exp1 :: Exp
+	| NegApp	 exp :: Exp
+	| Lambda	 srcloc :: SrcLoc pats :: Pats exp :: Exp
+	| Let	 binds :: Binds exp :: Exp
+	| If	 exp :: Exp exp1 :: Exp exp2 :: Exp
+	| Case	 exp :: Exp alts :: Alts
+	| Do	 stmts :: Stmts
+	| MDo	 stmts :: Stmts
+	| Tuple	 exps :: Exps
+	| TupleSection	 expopts :: ExpOpts
+	| List	 exps :: Exps
+	| Paren	 exp :: Exp
+	| LeftSection	 exp :: Exp qop :: QOp
+	| RightSection	 qop :: QOp exp :: Exp
+	| RecConstr	 qname :: QName fieldupdates :: FieldUpdates
+	| RecUpdate	 exp :: Exp fieldupdates :: FieldUpdates
+	| EnumFrom	 exp :: Exp
+	| EnumFromTo	 exp :: Exp exp1 :: Exp
+	| EnumFromThen	 exp :: Exp exp1 :: Exp
+	| EnumFromThenTo	 exp :: Exp exp1 :: Exp exp2 :: Exp
+	| ListComp	 exp :: Exp qualstmts :: QualStmts
+	| ParComp	 exp :: Exp qualstmtss :: QualStmtss
+	| ExpTypeSig	 srcloc :: SrcLoc exp :: Exp ty :: Type
+	| VarQuote	 qname :: QName
+	| TypQuote	 qname :: QName
+	| BracketExp	 bracket :: Bracket
+	| SpliceExp	 splice :: Splice
+	| QuasiQuote	 string :: String string1 :: String
+	| XTag	 srcloc :: SrcLoc xname :: XName xattrs :: XAttrs expopt :: ExpOpt exps :: Exps
+	| XETag	 srcloc :: SrcLoc xname :: XName xattrs :: XAttrs expopt :: ExpOpt
+	| XPcdata	 string :: String
+	| XExpTag	 exp :: Exp
+	| XChildTag	 srcloc :: SrcLoc exps :: Exps
+	| CorePragma	 string :: String exp :: Exp
+	| SCCPragma	 string :: String exp :: Exp
+	| GenPragma	 string :: String ints :: {Int, Int} ints1 :: {Int, Int} exp :: Exp
+	| Proc	 srcloc :: SrcLoc pat :: Pat exp :: Exp
+	| LeftArrApp	 exp :: Exp exp1 :: Exp
+	| RightArrApp	 exp :: Exp exp1 :: Exp
+	| LeftArrHighApp	 exp :: Exp exp1 :: Exp
+	| RightArrHighApp	 exp :: Exp exp1 :: Exp
+
+deriving Exp : Eq, Ord, Show, Typeable, Data
+
+
+data XName
+	| XName	 string :: String
+	| XDomName	 string :: String string1 :: String
+
+deriving XName : Eq, Ord, Show, Typeable, Data
+
+
+data XAttr
+	| XAttr	 xname :: XName exp :: Exp
+
+deriving XAttr : Eq, Ord, Show, Typeable, Data
+
+
+data Bracket
+	| ExpBracket	 exp :: Exp
+	| PatBracket	 pat :: Pat
+	| TypeBracket	 ty :: Type
+	| DeclBracket	 decls :: Decls
+
+deriving Bracket : Eq, Ord, Show, Typeable, Data
+
+
+data Splice
+	| IdSplice	 string :: String
+	| ParenSplice	 exp :: Exp
+
+deriving Splice : Eq, Ord, Show, Typeable, Data
+
+
+data Safety
+	| PlayRisky	 
+	| PlaySafe	 bool :: Bool
+
+deriving Safety : Eq, Ord, Show, Typeable, Data
+
+
+data CallConv
+	| StdCall	 
+	| CCall	 
+	| CPlusPlus	 
+	| DotNet	 
+	| Jvm	 
+	| Js	 
+
+deriving CallConv : Eq, Ord, Show, Typeable, Data
+
+
+data ModulePragma
+	| LanguagePragma	 srcloc :: SrcLoc names :: Names
+	| OptionsPragma	 srcloc :: SrcLoc toolopt :: ToolOpt string :: String
+	| AnnModulePragma	 srcloc :: SrcLoc annotation :: Annotation
+
+deriving ModulePragma : Eq, Ord, Show, Typeable, Data
+
+
+data Activation
+	| AlwaysActive	 
+	| ActiveFrom	 int :: Int
+	| ActiveUntil	 int :: Int
+
+deriving Activation : Eq, Ord, Show, Typeable, Data
+
+
+data Rule
+	| Rule	 string :: String activation :: Activation rulevarsopt :: RuleVarsOpt exp :: Exp exp1 :: Exp
+
+deriving Rule : Eq, Ord, Show, Typeable, Data
+
+
+data RuleVar
+	| RuleVar	 name :: Name
+	| TypedRuleVar	 name :: Name ty :: Type
+
+deriving RuleVar : Eq, Ord, Show, Typeable, Data
+
+
+data WarningText
+	| DeprText	 string :: String
+	| WarnText	 string :: String
+
+deriving WarningText : Eq, Ord, Show, Typeable, Data
+
+
+data Pat
+	| PVar	 name :: Name
+	| PLit	 literal :: Literal
+	| PNeg	 pat :: Pat
+	| PNPlusK	 name :: Name integer :: Integer
+	| PInfixApp	 pat :: Pat qname :: QName pat1 :: Pat
+	| PApp	 qname :: QName pats :: Pats
+	| PTuple	 pats :: Pats
+	| PList	 pats :: Pats
+	| PParen	 pat :: Pat
+	| PRec	 qname :: QName patfields :: PatFields
+	| PAsPat	 name :: Name pat :: Pat
+	| PWildCard	 
+	| PIrrPat	 pat :: Pat
+	| PatTypeSig	 srcloc :: SrcLoc pat :: Pat ty :: Type
+	| PViewPat	 exp :: Exp pat :: Pat
+	| PRPat	 rpats :: RPats
+	| PXTag	 srcloc :: SrcLoc xname :: XName pxattrs :: PXAttrs patopt :: PatOpt pats :: Pats
+	| PXETag	 srcloc :: SrcLoc xname :: XName pxattrs :: PXAttrs patopt :: PatOpt
+	| PXPcdata	 string :: String
+	| PXPatTag	 pat :: Pat
+	| PXRPats	 rpats :: RPats
+	| PExplTypeArg	 qname :: QName ty :: Type
+	| PQuasiQuote	 string :: String string1 :: String
+	| PBangPat	 pat :: Pat
+
+deriving Pat : Eq, Ord, Show, Typeable, Data
+
+
+data PXAttr
+	| PXAttr	 xname :: XName pat :: Pat
+
+deriving PXAttr : Eq, Ord, Show, Typeable, Data
+
+
+data RPatOp
+	| RPStar	 
+	| RPStarG	 
+	| RPPlus	 
+	| RPPlusG	 
+	| RPOpt	 
+	| RPOptG	 
+
+deriving RPatOp : Eq, Ord, Show, Typeable, Data
+
+
+data RPat
+	| RPOp	 rpat :: RPat rpatop :: RPatOp
+	| RPEither	 rpat :: RPat rpat1 :: RPat
+	| RPSeq	 rpats :: RPats
+	| RPGuard	 pat :: Pat stmts :: Stmts
+	| RPCAs	 name :: Name rpat :: RPat
+	| RPAs	 name :: Name rpat :: RPat
+	| RPParen	 rpat :: RPat
+	| RPPat	 pat :: Pat
+
+deriving RPat : Eq, Ord, Show, Typeable, Data
+
+
+data PatField
+	| PFieldPat	 qname :: QName pat :: Pat
+	| PFieldPun	 name :: Name
+	| PFieldWildcard	 
+
+deriving PatField : Eq, Ord, Show, Typeable, Data
+
+
+data Stmt
+	| Generator	 srcloc :: SrcLoc pat :: Pat exp :: Exp
+	| Qualifier	 exp :: Exp
+	| LetStmt	 binds :: Binds
+	| RecStmt	 stmts :: Stmts
+
+deriving Stmt : Eq, Ord, Show, Typeable, Data
+
+
+data QualStmt
+	| QualStmt	 stmt :: Stmt
+	| ThenTrans	 exp :: Exp
+	| ThenBy	 exp :: Exp exp1 :: Exp
+	| GroupBy	 exp :: Exp
+	| GroupUsing	 exp :: Exp
+	| GroupByUsing	 exp :: Exp exp1 :: Exp
+
+deriving QualStmt : Eq, Ord, Show, Typeable, Data
+
+
+data FieldUpdate
+	| FieldUpdate	 qname :: QName exp :: Exp
+	| FieldPun	 name :: Name
+	| FieldWildcard	 
+
+deriving FieldUpdate : Eq, Ord, Show, Typeable, Data
+
+
+data Alt
+	| Alt	 srcloc :: SrcLoc pat :: Pat guardedalts :: GuardedAlts binds :: Binds
+
+deriving Alt : Eq, Ord, Show, Typeable, Data
+
+
+data GuardedAlts
+	| UnGuardedAlt	 exp :: Exp
+	| GuardedAlts	 guardedaltlist :: GuardedAltList
+
+deriving GuardedAlts : Eq, Ord, Show, Typeable, Data
+
+
+data GuardedAlt
+	| GuardedAlt	 srcloc :: SrcLoc stmts :: Stmts exp :: Exp
+
+deriving GuardedAlt : Eq, Ord, Show, Typeable, Data
+
+type Alts = [Alt]
+type BangTypes = [BangType]
+type CNames = [CName]
+type ClassDecls = [ClassDecl]
+type Decls = [Decl]
+type Derivings = [Deriving]
+type ExpOpt = maybe Exp
+type ExpOpts = [ExpOpt]
+type ExportSpecs = [ExportSpec]
+type ExportSpecsOpt = maybe ExportSpecs
+type Exps = [Exp]
+type FieldUpdates = [FieldUpdate]
+type FunDeps = [FunDep]
+type GadtDecls = [GadtDecl]
+type GuardedAltList = [GuardedAlt]
+type GuardedRhss = [GuardedRhs]
+type IPBinds = [IPBind]
+type ImportDecls = [ImportDecl]
+type ImportSpecs = [ImportSpec]
+type ImportSpecsBool = (Bool, ImportSpecs)
+type ImportSpecsOpt = maybe ImportSpecsBool -- TODO: curly braces would be better
+type InstDecls = [InstDecl]
+type KindOpt = maybe Kind
+type Matchs = [Match]
+type ModuleNameOpt = maybe ModuleName
+type ModulePragmas = [ModulePragma]
+type Names = [Name]
+type Ops = [Op]
+type PXAttrs = [PXAttr]
+type PatFields = [PatField]
+type PatOpt = maybe Pat
+type Pats = [Pat]
+type QualConDecls = [QualConDecl]
+type QualStmts = [QualStmt]
+type QualStmtss = [QualStmts]
+type RPats = [RPat]
+type RuleVars = [RuleVar]
+type RuleVarsOpt = maybe RuleVars
+type Rules = [Rule]
+type Stmts = [Stmt]
+type StringOpt = maybe String
+type ToolOpt = maybe Tool
+type TyVarBinds = [TyVarBind]
+type TyVarBindsOpt = maybe TyVarBinds
+type TypeOpt = maybe Type
+type Types = [Type]
+type WarningTextOpt = maybe WarningText
+type XAttrs = [XAttr]

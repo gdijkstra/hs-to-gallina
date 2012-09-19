@@ -1,0 +1,17 @@
+imports
+{
+import Language.Haskell.Exts.Syntax
+}
+
+module {AG} {} {}
+
+include "AG/Types.ag"
+include "AG/Syntax.ag"
+include "AG/Convert.ag"
+
+{
+
+convertToGallina :: Module -> String
+convertToGallina m = gallina_Syn_Module $ wrap_Module (sem_Module m) $ Inh_Module
+  
+}
