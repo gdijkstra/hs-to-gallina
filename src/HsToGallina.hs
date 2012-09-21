@@ -1,6 +1,7 @@
 import Language.Haskell.Exts
 import System.Environment (getArgs)
 import AG
+import Gallina
 
 data Args = Args 
             { filePath :: String
@@ -17,7 +18,7 @@ convertFile :: Args -> IO ()
 convertFile args = do
   res <- parseFile . filePath $ args
   case res of
-    ParseOk m -> putStrLn . convertToGallina $ m
+    ParseOk m -> putStrLn . ppVernacular . convertToGallina $ m
     ParseFailed _ _ -> putStrLn "convertFile: Parsing failed."
 
 main :: IO ()

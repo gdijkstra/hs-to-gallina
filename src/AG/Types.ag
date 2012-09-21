@@ -47,4 +47,5 @@ type TypeOpt = Maybe Type
 type Types = [Type]
 type WarningTextOpt = Maybe WarningText
 type XAttrs = [XAttr]
+type GallinaDeclOpt = Maybe GallinaDecl
 }

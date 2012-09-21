@@ -1,6 +1,7 @@
 imports
 {
 import Language.Haskell.Exts.Syntax
+import Gallina
 }
 
 module {AG} {} {}
@@ -11,7 +12,7 @@ include "AG/Convert.ag"
 
 {
 
-convertToGallina :: Module -> String
-convertToGallina m = gallina_Syn_Module $ wrap_Module (sem_Module m) $ Inh_Module
+convertToGallina :: Module -> Vernacular
+convertToGallina m = vernacular_Syn_Module $ wrap_Module (sem_Module m) $ Inh_Module
   
 }

@@ -14,3 +14,9 @@ notB F = T
 andB :: B -> B -> B
 andB T T = T
 andB _ _ = F
+
+idPolymorphic :: a -> a
+idPolymorphic a = a
+
+constPolymorphic :: a -> b -> a
+constPolymorphic a b = a

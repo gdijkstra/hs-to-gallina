@@ -13,4 +13,5 @@ executable HsToGallina
   build-depends: base
                  , uuagc
                  , haskell-src-exts
+                 , containers
   hs-source-dirs: src

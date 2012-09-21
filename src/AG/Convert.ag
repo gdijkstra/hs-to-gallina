@@ -1,6 +1,122 @@
+imports
+{
+import Data.Maybe
+import Data.Set hiding (map)
+}
+
 attr Module
-  syn gallina :: {String}
+  syn vernacular :: Vernacular
                  
 sem Module                 
-  | Module lhs.gallina = "hoi"
+  | Module lhs.vernacular = let dataDecls = mapMaybe toDataType @decls.gallinaDecls
+                                toDataType (GallinaDataTypeDecl d) = Just d
+                                toDataType _ = Nothing
+                                toDefinition (GallinaTypeSigDecl n t) = Just (GallinaDefinition n t undefined) -- tmp
+                                toDefinition _ = Nothing -- tmp
+                                defs = mapMaybe toDefinition @decls.gallinaDecls -- tmp
+                            in Vernacular { moduleName = @modulename.name
+                                          , dataTypes = dataDecls
+                                          , definitions = defs
+                                          }
+                            
+attr ModuleName Name QName
+  syn name :: String
+              
+sem ModuleName
+  | ModuleName lhs.name = @string
 
+sem Name
+  | Ident lhs.name = @string
+  | Symbol lhs.name = @string
+
+sem QName
+  | Qual lhs.name = @modulename.name ++ "." ++ @name.name
+  | UnQual lhs.name = @name.name
+  | Special lhs.name = error "Don't do this"
+                          
+
+attr Decls
+  syn gallinaDecls :: {[GallinaDecl]}
+--  syn types :: Map Ident GallinaType
+
+sem Decls
+  | Nil  lhs.gallinaDecls = []
+  | Cons lhs.gallinaDecls = @hd.gallinaDecl ++ @tl.gallinaDecls
+
+attr Names
+  syn names :: {[String]}
+
+sem Names
+  | Nil lhs.names = []
+  | Cons lhs.names = @hd.name : @tl.names
+
+attr Decl                          
+  syn gallinaDecl :: {[GallinaDecl]}
+--  syn types :: [(Ident, GallinaType)]
+
+sem Decl                     
+  | TypeDecl         lhs.gallinaDecl = []
+  | TypeFamDecl      lhs.gallinaDecl = []
+  | DataDecl         lhs.gallinaDecl = [GallinaDataTypeDecl $ GallinaDataType @name.name @qualcondecls.constrs]
+  | GDataDecl        lhs.gallinaDecl = []
+  | DataFamDecl      lhs.gallinaDecl = []
+  | TypeInsDecl      lhs.gallinaDecl = []
+  | DataInsDecl      lhs.gallinaDecl = []
+  | GDataInsDecl     lhs.gallinaDecl = []
+  | ClassDecl        lhs.gallinaDecl = []
+  | InstDecl         lhs.gallinaDecl = []
+  | DerivDecl        lhs.gallinaDecl = []
+  | InfixDecl        lhs.gallinaDecl = []
+  | DefaultDecl      lhs.gallinaDecl = []
+  | SpliceDecl       lhs.gallinaDecl = []
+  | TypeSig          lhs.gallinaDecl = map (\n -> GallinaTypeSigDecl n (GallinaType (toList @ty.ftv) @ty.args @ty.res)) @names.names
+  | FunBind          lhs.gallinaDecl = []
+  | PatBind          lhs.gallinaDecl = []
+  | ForImp           lhs.gallinaDecl = []
+  | ForExp           lhs.gallinaDecl = []
+  | RulePragmaDecl   lhs.gallinaDecl = []
+  | DeprPragmaDecl   lhs.gallinaDecl = []
+  | WarnPragmaDecl   lhs.gallinaDecl = []
+  | InlineSig        lhs.gallinaDecl = []
+  | InlineConlikeSig lhs.gallinaDecl = []
+  | SpecSig          lhs.gallinaDecl = []
+  | SpecInlineSig    lhs.gallinaDecl = []
+  | InstSig          lhs.gallinaDecl = []
+  | AnnPragma        lhs.gallinaDecl = []
+
+attr QualConDecls
+  syn constrs :: {[GallinaConstructor]}
+
+sem QualConDecls
+  | Nil  lhs.constrs = []
+  | Cons lhs.constrs = @hd.constr : @tl.constrs
+
+             
+attr QualConDecl ConDecl
+  syn constr :: GallinaConstructor
+             
+sem QualConDecl
+  | QualConDecl lhs.constr = @condecl.constr
+                             
+sem ConDecl             
+  | ConDecl lhs.constr = GallinaConstructor @name.name [] -- TODO: do smth with fields
+  | InfixConDecl lhs.constr = error "Don't do this"
+  | RecDecl lhs.constr = error "Don't do this"
+
+attr Type
+  syn ftv use {`union`} {empty} :: {Set String}
+  syn args use {++} {[]} :: {[String]}
+  syn res :: String
+             
+sem Type
+  | TyApp lhs.res = error "Don't do this"
+  | TyList lhs.res = error "Don't do this"
+  | TyInfix lhs.res = error "Don't do this"
+  | TyTuple lhs.res = error "Don't do this"
+  | TyCon lhs.res = @qname.name
+  | TyVar lhs.res = @name.name
+  | TyCon lhs.args = [@qname.name]
+  | TyVar lhs.args = [@name.name]
+  | TyFun lhs.args = @ty.args
+  | TyVar lhs.ftv = singleton @name.name
+                    
