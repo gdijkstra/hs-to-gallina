@@ -1,17 +1,20 @@
 imports
 {
 import Data.Maybe
-import Data.Set hiding (map)
+import Data.Map (Map)
+import qualified Data.Map as M
+--import Data.Set hiding (map)
 }
 
 attr Module
   syn vernacular :: Vernacular
+  syn types :: {Map String GallinaType}
                  
 sem Module                 
   | Module lhs.vernacular = let dataDecls = mapMaybe toDataType @decls.gallinaDecls
                                 toDataType (GallinaDataTypeDecl d) = Just d
                                 toDataType _ = Nothing
-                                toDefinition (GallinaTypeSigDecl n t) = Just (GallinaDefinition n t undefined) -- tmp
+                                toDefinition (GallinaFunctionBinding n t _) = Just (GallinaDefinition n t undefined) -- tmp
                                 toDefinition _ = Nothing -- tmp
                                 defs = mapMaybe toDefinition @decls.gallinaDecls -- tmp
                             in Vernacular { moduleName = @modulename.name
@@ -19,6 +22,8 @@ sem Module
                                           , definitions = defs
                                           }
                             
+  | Module decls.types = M.fromList @decls.typeDecls
+
 attr ModuleName Name QName
   syn name :: String
               
@@ -34,15 +39,6 @@ sem QName
   | UnQual lhs.name = @name.name
   | Special lhs.name = error "Don't do this"
                           
-
-attr Decls
-  syn gallinaDecls :: {[GallinaDecl]}
---  syn types :: Map Ident GallinaType
-
-sem Decls
-  | Nil  lhs.gallinaDecls = []
-  | Cons lhs.gallinaDecls = @hd.gallinaDecl ++ @tl.gallinaDecls
-
 attr Names
   syn names :: {[String]}
 
@@ -50,9 +46,24 @@ sem Names
   | Nil lhs.names = []
   | Cons lhs.names = @hd.name : @tl.names
 
+attr Decls
+  syn gallinaDecls :: {[GallinaDecl]}
+  syn typeDecls :: {[(String, GallinaType)]}
+  inh types :: {Map String GallinaType}
+
+sem Decls
+  | Nil  lhs.gallinaDecls = []
+  | Cons lhs.gallinaDecls = @hd.gallinaDecl ++ @tl.gallinaDecls
+
+sem Decls
+  | Nil  lhs.typeDecls = []
+  | Cons lhs.typeDecls = @hd.typeDecls ++ @tl.typeDecls
+  | Cons hd.types = @lhs.types
+
 attr Decl                          
-  syn gallinaDecl :: {[GallinaDecl]}
---  syn types :: [(Ident, GallinaType)]
+  syn gallinaDecl :: {[GallinaDecl]} -- TODO: change this back to non-list type
+  syn typeDecls :: {[(String, GallinaType)]}
+  inh types :: {Map String GallinaType}
 
 sem Decl                     
   | TypeDecl         lhs.gallinaDecl = []
@@ -69,8 +80,10 @@ sem Decl
   | InfixDecl        lhs.gallinaDecl = []
   | DefaultDecl      lhs.gallinaDecl = []
   | SpliceDecl       lhs.gallinaDecl = []
-  | TypeSig          lhs.gallinaDecl = map (\n -> GallinaTypeSigDecl n (GallinaType (toList @ty.ftv) @ty.args @ty.res)) @names.names
-  | FunBind          lhs.gallinaDecl = []
+  | TypeSig          lhs.gallinaDecl = []
+  | FunBind          lhs.gallinaDecl = return $ case M.lookup @matches.name @lhs.types of
+                                         Nothing -> error "this should not happen"
+                                         (Just t) -> GallinaFunctionBinding @matches.name t undefined
   | PatBind          lhs.gallinaDecl = []
   | ForImp           lhs.gallinaDecl = []
   | ForExp           lhs.gallinaDecl = []
@@ -83,6 +96,46 @@ sem Decl
   | SpecInlineSig    lhs.gallinaDecl = []
   | InstSig          lhs.gallinaDecl = []
   | AnnPragma        lhs.gallinaDecl = []
+
+sem Decl
+  | TypeDecl         lhs.typeDecls = []
+  | TypeFamDecl      lhs.typeDecls = []
+  | DataDecl         lhs.typeDecls = []
+  | GDataDecl        lhs.typeDecls = []
+  | DataFamDecl      lhs.typeDecls = []
+  | TypeInsDecl      lhs.typeDecls = []
+  | DataInsDecl      lhs.typeDecls = []
+  | GDataInsDecl     lhs.typeDecls = []
+  | ClassDecl        lhs.typeDecls = []
+  | InstDecl         lhs.typeDecls = []
+  | DerivDecl        lhs.typeDecls = []
+  | InfixDecl        lhs.typeDecls = []
+  | DefaultDecl      lhs.typeDecls = []
+  | SpliceDecl       lhs.typeDecls = []
+  | TypeSig          lhs.typeDecls = map (\n -> (n, (generalise @ty.gallinaType))) @names.names
+  | FunBind          lhs.typeDecls = []
+  | PatBind          lhs.typeDecls = []
+  | ForImp           lhs.typeDecls = []
+  | ForExp           lhs.typeDecls = []
+  | RulePragmaDecl   lhs.typeDecls = []
+  | DeprPragmaDecl   lhs.typeDecls = []
+  | WarnPragmaDecl   lhs.typeDecls = []
+  | InlineSig        lhs.typeDecls = []
+  | InlineConlikeSig lhs.typeDecls = []
+  | SpecSig          lhs.typeDecls = []
+  | SpecInlineSig    lhs.typeDecls = []
+  | InstSig          lhs.typeDecls = []
+  | AnnPragma        lhs.typeDecls = []
+
+attr Matches Match
+  syn name :: String
+
+sem Matches
+  | Nil  lhs.name = error "Matches list should never be empty"
+  | Cons lhs.name = @hd.name
+                    
+sem Match                    
+  | Match lhs.name = @name.name
 
 attr QualConDecls
   syn constrs :: {[GallinaConstructor]}
@@ -104,19 +157,16 @@ sem ConDecl
   | RecDecl lhs.constr = error "Don't do this"
 
 attr Type
-  syn ftv use {`union`} {empty} :: {Set String}
-  syn args use {++} {[]} :: {[String]}
-  syn res :: String
-             
+  syn gallinaType :: GallinaType
+                     
 sem Type
-  | TyApp lhs.res = error "Don't do this"
-  | TyList lhs.res = error "Don't do this"
-  | TyInfix lhs.res = error "Don't do this"
-  | TyTuple lhs.res = error "Don't do this"
-  | TyCon lhs.res = @qname.name
-  | TyVar lhs.res = @name.name
-  | TyCon lhs.args = [@qname.name]
-  | TyVar lhs.args = [@name.name]
-  | TyFun lhs.args = @ty.args
-  | TyVar lhs.ftv = singleton @name.name
-                    
+  | TyForall lhs.gallinaType = error "foralls not supported"
+  | TyFun    lhs.gallinaType = GallinaTyFun @ty.gallinaType @ty1.gallinaType
+  | TyTuple  lhs.gallinaType = error "tuples not supported"
+  | TyList   lhs.gallinaType = error "lists not supported"
+  | TyApp    lhs.gallinaType = error "applications not supported"
+  | TyVar    lhs.gallinaType = GallinaTyVar @name.name
+  | TyCon    lhs.gallinaType = GallinaTyCon @qname.name
+  | TyParen  lhs.gallinaType = @ty.gallinaType
+  | TyInfix  lhs.gallinaType = error "infix not supported"
+  | TyKind   lhs.gallinaType = error "kinds not supported"

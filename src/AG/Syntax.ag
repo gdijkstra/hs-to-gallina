@@ -113,7 +113,7 @@ data Decl
 	| DefaultDecl	 srcloc :: SrcLoc types :: Types
 	| SpliceDecl	 srcloc :: SrcLoc exp :: Exp
 	| TypeSig	 srcloc :: SrcLoc names :: Names ty :: Type
-	| FunBind	 matchs :: Matchs
+	| FunBind	 matches :: Matches
 	| PatBind	 srcloc :: SrcLoc pat :: Pat typeopt :: TypeOpt rhs :: Rhs binds :: Binds
 	| ForImp	 srcloc :: SrcLoc callconv :: CallConv safety :: Safety string :: String name :: Name ty :: Type
 	| ForExp	 srcloc :: SrcLoc callconv :: CallConv string :: String name :: Name ty :: Type
@@ -555,7 +555,7 @@ type ImportSpecsBool = (Bool, ImportSpecs)
 type ImportSpecsOpt = maybe ImportSpecsBool -- TODO: curly braces would be better
 type InstDecls = [InstDecl]
 type KindOpt = maybe Kind
-type Matchs = [Match]
+type Matches = [Match]
 type ModuleNameOpt = maybe ModuleName
 type ModulePragmas = [ModulePragma]
 type Names = [Name]
