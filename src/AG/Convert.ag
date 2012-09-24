@@ -14,7 +14,7 @@ sem Module
   | Module lhs.vernacular = let dataDecls = mapMaybe toDataType @decls.gallinaDecls
                                 toDataType (GallinaDataTypeDecl d) = Just d
                                 toDataType _ = Nothing
-                                toDefinition (GallinaFunctionBinding n t _) = Just (GallinaDefinition n t undefined) -- tmp
+                                toDefinition (GallinaFunctionBinding n t b) = Just (GallinaDefinition n t b) -- TODO: tmp
                                 toDefinition _ = Nothing -- tmp
                                 defs = mapMaybe toDefinition @decls.gallinaDecls -- tmp
                             in Vernacular { moduleName = @modulename.name
@@ -83,7 +83,7 @@ sem Decl
   | TypeSig          lhs.gallinaDecl = []
   | FunBind          lhs.gallinaDecl = return $ case M.lookup @matches.name @lhs.types of
                                          Nothing -> error "this should not happen"
-                                         (Just t) -> GallinaFunctionBinding @matches.name t undefined
+                                         (Just t) -> GallinaFunctionBinding @matches.name t (GallinaFunctionBody @matches.arity @matches.gallinaMatches)
   | PatBind          lhs.gallinaDecl = []
   | ForImp           lhs.gallinaDecl = []
   | ForExp           lhs.gallinaDecl = []
@@ -129,13 +129,25 @@ sem Decl
 
 attr Matches Match
   syn name :: String
+  syn arity :: Int
 
+attr Matches
+  syn gallinaMatches :: {[GallinaMatch]}
+
+attr Match
+  syn gallinaMatch :: GallinaMatch
+                        
 sem Matches
   | Nil  lhs.name = error "Matches list should never be empty"
+  | Nil  lhs.arity = error "Matches list should never be empty"
+  | Nil  lhs.gallinaMatches = []
   | Cons lhs.name = @hd.name
-                    
+  | Cons lhs.arity = @hd.arity
+  | Cons lhs.gallinaMatches = @hd.gallinaMatch : @tl.gallinaMatches
+
 sem Match                    
   | Match lhs.name = @name.name
+  | Match lhs.arity = length @pats
 
 attr QualConDecls
   syn constrs :: {[GallinaConstructor]}

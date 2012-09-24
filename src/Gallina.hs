@@ -10,7 +10,7 @@ data Vernacular = Vernacular { moduleName :: String
                              }
 
 data GallinaDecl = GallinaDataTypeDecl GallinaDataType
-                 | GallinaFunctionBinding String GallinaType GallinaTerm
+                 | GallinaFunctionBinding String GallinaType GallinaFunctionBody
                  | GallinaTypeSigDecl String GallinaType
 
 data GallinaDataType = GallinaDataType { dataTypeName :: String
@@ -28,13 +28,19 @@ data GallinaType
 
 data GallinaDefinition = GallinaDefinition { defName :: String
                                            , defType :: GallinaType
-                                           , defBody :: GallinaTerm
+                                           , defBody :: GallinaFunctionBody
                                            }
 
-data GallinaTerm = GallinaLam [String] GallinaTerm
-                 | GallinaApp GallinaTerm GallinaTerm
-                 | GallinaVar String
--- and pattern matching etc.
+data GallinaFunctionBody = GallinaFunctionBody { functionArity :: Int
+                                               , functionMatches :: [GallinaMatch]
+                                               }
+
+data GallinaMatch = GallinaMatch [GallinaPat] GallinaTerm
+
+data GallinaPat = GallinaPVar String
+
+data GallinaTerm = GallinaVar String
+
 
 ppVernacular :: Vernacular -> String
 ppVernacular v = "Module " ++ moduleName v ++ ".\n\n" 
@@ -55,7 +61,7 @@ ppConstr n c  = constrName c ++ " : " ++ ( intercalate " -> " . (++ [n]) . field
 ppDefinition :: GallinaDefinition -> String
 ppDefinition d = "Definition " ++ defName d 
                  ++ " " ++ (ppBoundVars . defType $ d)
-                 ++ " : " ++ (ppType . defType $ d) ++ " :=\n\t" ++ (ppTerm . defBody $ d) ++ "."
+                 ++ " : " ++ (ppType . defType $ d) ++ " :=\n\t" ++ (ppBody . defBody $ d) ++ "."
 
         
 testDefinition :: GallinaDefinition
@@ -75,7 +81,18 @@ ppType (GallinaTyVar str) = str
 ppType (GallinaTyCon str) = str
 
 ppTerm :: GallinaTerm -> String
-ppTerm _ = ""
+ppTerm (GallinaVar str) = str
+
+ppBody :: GallinaFunctionBody -> String
+ppBody b = "fun " ++ unwords (map (\n -> "x" ++ show n) [0 .. (functionArity b - 1)])
+           ++ " => \n\tmatch " ++ (intercalate ", " . map (\n -> "x" ++ show n) $ [0 .. (functionArity b - 1)]) ++ " with"
+           ++ intercalate "\n\t| " (map ppMatch . functionMatches $ b) ++ "\nend."
+           
+ppMatch :: GallinaMatch -> String           
+ppMatch (GallinaMatch pats t) = (intercalate ", " . map ppPat $ pats) ++ " => " ++ ppTerm t
+
+ppPat :: GallinaPat -> String
+ppPat (GallinaPVar s) = s
 
 generalise :: GallinaType -> GallinaType
 generalise ty = let vars = ftv ty in if not (null vars) 
