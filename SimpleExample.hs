@@ -3,6 +3,9 @@ module SimpleExample where
 data B = T 
        | F
 
+data ListB = Nil
+           | Cons B ListB
+
 idB :: B -> B
 idB T = T
 idB F = F
