@@ -5,8 +5,11 @@ data B = T
 
 data Nat = Zero | Succ Nat
 
-data ListB = Nil
-           | Cons B ListB
+data List a = Nil
+            | Cons a (List a)
+
+data Either a b = Left a
+                | Right b
 
 data Lam = Var String
          | Abs (Lam -> Lam)

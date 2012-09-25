@@ -68,11 +68,17 @@ attr Decl
   syn typeDecls :: {[(String, GallinaType)]}
   inh types :: {Map String GallinaType}
 
+{
+ppParams :: [String] -> String
+ppParams [] = ""
+ppParams xs@(_:_) = ' ' : unwords xs
+}
+
 sem Decl                     
   | TypeDecl         lhs.gallinaDecl = []
   | TypeFamDecl      lhs.gallinaDecl = []
-  | DataDecl         lhs.gallinaDecl = [GallinaInductiveDecl $ GallinaInductive @name.name @qualcondecls.constrs]
-  | DataDecl         qualcondecls.dataName = @name.name
+  | DataDecl         lhs.gallinaDecl = [GallinaInductiveDecl $ GallinaInductive @name.name @tyvarbinds.params @qualcondecls.constrs]
+  | DataDecl         qualcondecls.dataName = @name.name ++ ppParams @tyvarbinds.params
   | GDataDecl        lhs.gallinaDecl = []
   | DataFamDecl      lhs.gallinaDecl = []
   | TypeInsDecl      lhs.gallinaDecl = []
@@ -130,6 +136,20 @@ sem Decl
   | SpecInlineSig    lhs.typeDecls = []
   | InstSig          lhs.typeDecls = []
   | AnnPragma        lhs.typeDecls = []
+
+attr TyVarBinds
+  syn params :: {[String]}
+            
+sem TyVarBinds
+  | Nil  lhs.params = []
+  | Cons lhs.params = @hd.name : @tl.params
+
+attr TyVarBind
+  syn name :: String
+              
+sem TyVarBind
+  | KindedVar   lhs.name = error "Unsupported: KindedVar"
+  | UnkindedVar lhs.name = @name.name
 
 attr Matches Match
   syn name :: String
@@ -295,7 +315,7 @@ sem Type
   | TyFun    lhs.gallinaType = GallinaTyFun @ty.gallinaType @ty1.gallinaType
   | TyTuple  lhs.gallinaType = error "tuples not supported"
   | TyList   lhs.gallinaType = error "lists not supported"
-  | TyApp    lhs.gallinaType = error "applications not supported"
+  | TyApp    lhs.gallinaType = GallinaTyApp @ty.gallinaType @ty1.gallinaType
   | TyVar    lhs.gallinaType = GallinaTyVar @name.name
   | TyCon    lhs.gallinaType = GallinaTyCon @qname.name
   | TyParen  lhs.gallinaType = @ty.gallinaType

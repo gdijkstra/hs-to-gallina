@@ -12,6 +12,7 @@ data Vernacular = Vernacular { moduleName :: String
                              }
 
 data GallinaInductive = GallinaInductive { inductiveName :: String
+                                         , inductiveParams :: [String]
                                          , inductiveConstrs :: [GallinaConstructor] }
 
 
@@ -39,6 +40,7 @@ data GallinaPat = GallinaPVar String
 data GallinaType
      = GallinaTyForall [String] GallinaType
      | GallinaTyFun GallinaType GallinaType        
+     | GallinaTyApp GallinaType GallinaType        
      | GallinaTyVar String
      | GallinaTyCon String
 
@@ -63,10 +65,14 @@ instance Pp Vernacular where
               ]
 
 instance Pp GallinaInductive where
-  pp a = text "Inductive" <+> text (inductiveName a) <+> text ": Set :="
+  pp a = text "Inductive" <+> text (inductiveName a) <+> params <+> text ": Set :="
           $+$ nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a))
                       <> text ".")
-  
+    where params = if (not (null pars))
+                   then lparen <+> hsep (map text pars) <+> text ": Type" <+> rparen
+                   else empty
+          pars = inductiveParams a
+
 instance Pp GallinaConstructor where
   pp a = text (constrName a) <+> text ":" <+> pp (constrType a)
 
@@ -101,6 +107,7 @@ instance Pp GallinaPat where
 instance Pp GallinaType where
   pp (GallinaTyForall _ ty) = pp ty -- TODO: do smth with vars
   pp (GallinaTyFun l r) = pp l <+> text "->" <+> pp r -- TODO: parentheses
+  pp (GallinaTyApp l r) = pp l <+> pp r -- TODO: parentheses
   pp (GallinaTyVar s) = text s
   pp (GallinaTyCon s) = text s
   
@@ -115,6 +122,7 @@ generalise ty = let vars = ftv ty in if not (null vars)
 ftv :: GallinaType -> [String]
 ftv (GallinaTyForall _ _) = error "ftv: foralls should not occur here"
 ftv (GallinaTyFun l r) = union (ftv l) (ftv r)
+ftv (GallinaTyApp l r) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str) = return str
 ftv (GallinaTyCon _) = []
 
