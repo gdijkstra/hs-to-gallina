@@ -1,14 +1,18 @@
+import AG
+import Control.Monad
+import Gallina
 import Language.Haskell.Exts
 import System.Environment (getArgs)
-import AG
-import Gallina
+import System.FilePath
 
 data Args = Args 
-            { filePath :: String
+            { filePath :: FilePath
+            , write :: Bool
             }
 
 parseArgs :: [String] -> Maybe Args
-parseArgs [path] = Just (Args path)
+parseArgs [path] = Just $ Args { filePath = path, write = False }
+parseArgs ["-w", path] = Just $ Args { filePath = path, write = True }
 parseArgs _ = Nothing
 
 helpMessage :: IO ()
@@ -18,7 +22,11 @@ convertFile :: Args -> IO ()
 convertFile args = do
   res <- parseFile . filePath $ args
   case res of
-    ParseOk m -> putStrLn . ppVernacular . convertToGallina $ m
+    ParseOk m -> do
+      let output = ppVernacular . convertToGallina $ m
+          fp = filePath args
+      putStrLn output
+      when (write args) (writeFile (replaceExtension fp ".v") output)
     ParseFailed _ _ -> putStrLn "convertFile: Parsing failed."
 
 main :: IO ()

@@ -14,7 +14,7 @@ haskell : src/AG.hs
 	runhaskell Setup.hs build $(CABAL-BUILD-FLAGS)
 
 test : all
-	./dist/build/HsToGallina/HsToGallina $(TESTFILE)
+	./dist/build/HsToGallina/HsToGallina -w $(TESTFILE)
 
 clean:
 	rm src/AG.hs 

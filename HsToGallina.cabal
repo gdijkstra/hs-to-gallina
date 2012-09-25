@@ -15,4 +15,5 @@ executable HsToGallina
                  , haskell-src-exts
                  , containers
                  , pretty
+                 , filepath
   hs-source-dirs: src
