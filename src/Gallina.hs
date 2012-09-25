@@ -1,24 +1,40 @@
 module Gallina where
 
 import Data.List
+import Text.PrettyPrint.HughesPJ
 
--- http://coq.inria.fr/refman/Reference-Manual003.html
+class Pp a where
+  pp :: a -> Doc
 
 data Vernacular = Vernacular { moduleName :: String 
-                             , dataTypes :: [GallinaDataType]
-                             , definitions :: [GallinaDefinition]
+                             , moduleDataTypes :: [GallinaInductive]
+                             , moduleDefinitions :: [GallinaDefinition]
                              }
 
-data GallinaDecl = GallinaDataTypeDecl GallinaDataType
-                 | GallinaFunctionBinding String GallinaType GallinaFunctionBody
-                 | GallinaTypeSigDecl String GallinaType
+data GallinaInductive = GallinaInductive { inductiveName :: String
+                                         , inductiveConstrs :: [GallinaConstructor] }
 
-data GallinaDataType = GallinaDataType { dataTypeName :: String
-                                       , constrs :: [GallinaConstructor] }
 
 data GallinaConstructor = GallinaConstructor { constrName :: String
-                                             , fields :: [String]
+                                             , constrType :: GallinaType
                                              }
+
+data GallinaDefinition = GallinaDefinition { defName :: String
+                                           , defType :: GallinaType
+                                           , defBody :: GallinaFunBody
+                                           }
+
+data GallinaFunBody = GallinaFunBody { funArity :: Int
+                                     , funMatches :: [GallinaMatch]
+                                     }
+
+data GallinaMatch = GallinaMatch { matchPats :: [GallinaPat] 
+                                 , matchTerm :: GallinaTerm
+                                 }
+
+data GallinaPat = GallinaPVar String
+                | GallinaPApp String [GallinaPat]
+                | GallinaPWildCard
 
 data GallinaType
      = GallinaTyForall [String] GallinaType
@@ -26,75 +42,70 @@ data GallinaType
      | GallinaTyVar String
      | GallinaTyCon String
 
-data GallinaDefinition = GallinaDefinition { defName :: String
-                                           , defType :: GallinaType
-                                           , defBody :: GallinaFunctionBody
-                                           }
-
-data GallinaFunctionBody = GallinaFunctionBody { functionArity :: Int
-                                               , functionMatches :: [GallinaMatch]
-                                               }
-
-data GallinaMatch = GallinaMatch [GallinaPat] GallinaTerm
-
-data GallinaPat = GallinaPVar String
-                | GallinaPApp String [GallinaPat]
-                | GallinaPWildCard
 
 data GallinaTerm = GallinaVar String
 
+-- Pretty printing
+
+commas :: [Doc] -> Doc
+commas = hsep . intersperse (text ",") -- TODO: fix unnecessary spaces
+
+vsep :: [Doc] -> Doc
+vsep = vcat . intersperse (text "")
 
 ppVernacular :: Vernacular -> String
-ppVernacular v = "Module " ++ moduleName v ++ ".\n\n" 
-                 ++ (intercalate "\n\n" . map ppDataType . dataTypes $ v) ++ "\n"
-                 ++ (intercalate "\n\n" . map ppDefinition . definitions $ v)
+ppVernacular = render . pp
+
+instance Pp Vernacular where
+  pp a = vsep [text "Module " <+> text (moduleName a) <> text "."
+              , vsep (map pp (moduleDataTypes a))
+              , vsep (map pp (moduleDefinitions a))
+              ]
+
+instance Pp GallinaInductive where
+  pp a = text "Inductive" <+> text (inductiveName a) <+> text ": Set :="
+          $+$ nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a))
+                      <> text ".")
   
-ppDataType :: GallinaDataType -> String
-ppDataType d = "Inductive " ++ dataTypeName d ++ " : Set :="
-               ++ (concatMap  ("\n  | "++) . map (ppConstr (dataTypeName d)) . constrs $ d)
-               ++ ".\n"
+instance Pp GallinaConstructor where
+  pp a = text (constrName a) <+> text ":" <+> pp (constrType a)
 
-               
-ppConstr :: String -> GallinaConstructor -> String
-ppConstr n c  = constrName c ++ " : " ++ ( intercalate " -> " . (++ [n]) . fields $ c)
+instance Pp GallinaDefinition where
+  pp a = text "Definition" <+> text (defName a) 
+         <+> ppDefType (defType a) <+> text ":="
+         $$ nest 2 (pp (defBody a) <> text ".")
+    where ppDefType (GallinaTyForall vars ty) = (if not (null vars)
+                                                     then text "{" <+> hsep (map text vars)
+                                                          <+> text ": Type" <+> text "}" 
+                                                     else empty) <+> text ":" <+> pp ty
+          ppDefType ty = text ":" <+> pp ty
 
-ppDefinition :: GallinaDefinition -> String
-ppDefinition d = "Definition " ++ defName d 
-                 ++ " " ++ (ppBoundVars . defType $ d)
-                 ++ " : " ++ (ppType . defType $ d) ++ " :=\n\t" ++ (ppBody . defBody $ d) ++ "."
+instance Pp GallinaFunBody where
+  pp a = text "fun" 
+          <+> hsep args
+          <+> text "=>" 
+          $$ nest 2 (text "match" <+> commas args <+> text "with" 
+                      $+$ nest 2 (vcat (map pp (funMatches a)))
+                      $+$ text "end")
+    where args = (map (\n -> text "x" <> text (show n)) [0 .. (funArity a - 1)])
 
-        
-testDefinition :: GallinaDefinition
-testDefinition = GallinaDefinition "const" (GallinaTyForall ["a", "b"] (GallinaTyFun (GallinaTyVar "a") (GallinaTyFun (GallinaTyVar "b") (GallinaTyVar "a")))) undefined
+instance Pp GallinaMatch where
+  pp a = text "|" <+> commas (map pp (matchPats a)) 
+             <+> text "=>" <+> pp (matchTerm a)
 
-ppBoundVars :: GallinaType -> String
-ppBoundVars (GallinaTyForall l _) = if not (null l)
-                                    then "{ " ++ unwords l ++ " : Type }"
-                                    else ""
-ppBoundVars _ = ""
+instance Pp GallinaPat where
+  pp (GallinaPVar s) = text s
+  pp (GallinaPApp s ps) = hsep (text s : map pp ps)
+  pp GallinaPWildCard = text "_"
 
--- Ignore foralls
-ppType :: GallinaType -> String
-ppType (GallinaTyForall _ t) = ppType t
-ppType (GallinaTyFun l r) = ppType l ++ " -> " ++ ppType r -- TODO: parentheses
-ppType (GallinaTyVar str) = str
-ppType (GallinaTyCon str) = str
-
-ppTerm :: GallinaTerm -> String
-ppTerm (GallinaVar str) = str
-
-ppBody :: GallinaFunctionBody -> String
-ppBody b = "fun " ++ unwords (map (\n -> "x" ++ show n) [0 .. (functionArity b - 1)])
-           ++ " => \n\tmatch " ++ (intercalate ", " . map (\n -> "x" ++ show n) $ [0 .. (functionArity b - 1)]) ++ " with"
-           ++ (concatMap (((++) "\n\t\t| ") . ppMatch) . functionMatches $ b) ++ "\nend"
-           
-ppMatch :: GallinaMatch -> String           
-ppMatch (GallinaMatch pats t) = (intercalate ", " . map ppPat $ pats) ++ " => " ++ ppTerm t
-
-ppPat :: GallinaPat -> String
-ppPat (GallinaPVar s) = s
-ppPat GallinaPWildCard = "_"
-ppPat (GallinaPApp s ps) = unwords (s : map ppPat ps)
+instance Pp GallinaType where
+  pp (GallinaTyForall _ ty) = pp ty -- TODO: do smth with vars
+  pp (GallinaTyFun l r) = pp l <+> text "->" <+> pp r -- TODO: parentheses
+  pp (GallinaTyVar s) = text s
+  pp (GallinaTyCon s) = text s
+  
+instance Pp GallinaTerm where  
+  pp (GallinaVar s) = text s
 
 generalise :: GallinaType -> GallinaType
 generalise ty = let vars = ftv ty in if not (null vars) 
@@ -106,3 +117,9 @@ ftv (GallinaTyForall _ _) = error "ftv: foralls should not occur here"
 ftv (GallinaTyFun l r) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str) = return str
 ftv (GallinaTyCon _) = []
+
+-- TODO: remove this, someday.
+testDefinition :: GallinaDefinition
+testDefinition = GallinaDefinition "const" (GallinaTyForall ["a", "b"] (GallinaTyFun (GallinaTyVar "a") (GallinaTyFun (GallinaTyVar "b") (GallinaTyVar "a")))) body
+  where body = GallinaFunBody 2 [GallinaMatch [GallinaPVar "a", GallinaPVar "b"] (GallinaVar "a")]
+

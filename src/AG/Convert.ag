@@ -4,7 +4,10 @@ import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
 import Language.Haskell.Exts.Pretty
---import Data.Set hiding (map)
+
+data GallinaDecl = GallinaInductiveDecl GallinaInductive
+                 | GallinaFunctionBinding String GallinaType GallinaFunBody
+
 }
 
 attr Module
@@ -13,14 +16,14 @@ attr Module
                  
 sem Module                 
   | Module lhs.vernacular = let dataDecls = mapMaybe toDataType @decls.gallinaDecls
-                                toDataType (GallinaDataTypeDecl d) = Just d
+                                toDataType (GallinaInductiveDecl d) = Just d
                                 toDataType _ = Nothing
                                 toDefinition (GallinaFunctionBinding n t b) = Just (GallinaDefinition n t b) -- TODO: tmp
                                 toDefinition _ = Nothing -- tmp
                                 defs = mapMaybe toDefinition @decls.gallinaDecls -- tmp
                             in Vernacular { moduleName = @modulename.name
-                                          , dataTypes = dataDecls
-                                          , definitions = defs
+                                          , moduleDataTypes = dataDecls
+                                          , moduleDefinitions = defs
                                           }
                             
   | Module decls.types = M.fromList @decls.typeDecls
@@ -69,7 +72,8 @@ attr Decl
 sem Decl                     
   | TypeDecl         lhs.gallinaDecl = []
   | TypeFamDecl      lhs.gallinaDecl = []
-  | DataDecl         lhs.gallinaDecl = [GallinaDataTypeDecl $ GallinaDataType @name.name @qualcondecls.constrs]
+  | DataDecl         lhs.gallinaDecl = [GallinaInductiveDecl $ GallinaInductive @name.name @qualcondecls.constrs]
+  | DataDecl         qualcondecls.dataName = @name.name
   | GDataDecl        lhs.gallinaDecl = []
   | DataFamDecl      lhs.gallinaDecl = []
   | TypeInsDecl      lhs.gallinaDecl = []
@@ -84,7 +88,7 @@ sem Decl
   | TypeSig          lhs.gallinaDecl = []
   | FunBind          lhs.gallinaDecl = return $ case M.lookup @matches.name @lhs.types of
                                          Nothing -> error "this should not happen"
-                                         (Just t) -> GallinaFunctionBinding @matches.name t (GallinaFunctionBody @matches.arity @matches.gallinaMatches)
+                                         (Just t) -> GallinaFunctionBinding @matches.name t (GallinaFunBody @matches.arity @matches.gallinaMatches)
   | PatBind          lhs.gallinaDecl = []
   | ForImp           lhs.gallinaDecl = []
   | ForExp           lhs.gallinaDecl = []
@@ -253,26 +257,39 @@ sem Exp
 
 
 attr QualConDecls
+  inh dataName :: String
   syn constrs :: {[GallinaConstructor]}
 
 sem QualConDecls
   | Nil  lhs.constrs = []
   | Cons lhs.constrs = @hd.constr : @tl.constrs
-
              
 attr QualConDecl ConDecl
+  inh dataName :: String
   syn constr :: GallinaConstructor
              
 sem QualConDecl
   | QualConDecl lhs.constr = @condecl.constr
                              
 sem ConDecl             
-  | ConDecl lhs.constr = GallinaConstructor @name.name [] -- TODO: do smth with fields
+  | ConDecl lhs.constr = GallinaConstructor @name.name @bangtypes.gallinaType
   | InfixConDecl lhs.constr = error "Don't do this"
   | RecDecl lhs.constr = error "Don't do this"
 
-attr Type
+attr BangTypes
+  inh dataName :: String
+
+attr BangTypes BangType Type
   syn gallinaType :: GallinaType
+                     
+sem BangTypes
+  | Nil  lhs.gallinaType = GallinaTyCon @lhs.dataName
+  | Cons lhs.gallinaType = GallinaTyFun @hd.gallinaType @tl.gallinaType
+                           
+sem BangType
+  | BangedTy   lhs.gallinaType = error "bangedty not supported"
+  | UnBangedTy lhs.gallinaType = @ty.gallinaType
+  | UnpackedTy lhs.gallinaType = error "unpackedty not supported"
                      
 sem Type
   | TyForall lhs.gallinaType = error "foralls not supported"
