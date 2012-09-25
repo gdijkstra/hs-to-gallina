@@ -1,5 +1,6 @@
 .DS_Store
 *.aux
 *.log
+*.v
 dist/
 src/AG.hs
