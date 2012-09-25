@@ -38,6 +38,8 @@ data GallinaFunctionBody = GallinaFunctionBody { functionArity :: Int
 data GallinaMatch = GallinaMatch [GallinaPat] GallinaTerm
 
 data GallinaPat = GallinaPVar String
+                | GallinaPApp String [GallinaPat]
+                | GallinaPWildCard
 
 data GallinaTerm = GallinaVar String
 
@@ -46,13 +48,11 @@ ppVernacular :: Vernacular -> String
 ppVernacular v = "Module " ++ moduleName v ++ ".\n\n" 
                  ++ (intercalate "\n\n" . map ppDataType . dataTypes $ v) ++ "\n"
                  ++ (intercalate "\n\n" . map ppDefinition . definitions $ v)
-                 ++ "\n# data types: " ++ show l
-  where l = length . dataTypes $ v
   
 ppDataType :: GallinaDataType -> String
 ppDataType d = "Inductive " ++ dataTypeName d ++ " : Set :="
                ++ (concatMap  ("\n  | "++) . map (ppConstr (dataTypeName d)) . constrs $ d)
-               ++ "."
+               ++ ".\n"
 
                
 ppConstr :: String -> GallinaConstructor -> String
@@ -86,13 +86,15 @@ ppTerm (GallinaVar str) = str
 ppBody :: GallinaFunctionBody -> String
 ppBody b = "fun " ++ unwords (map (\n -> "x" ++ show n) [0 .. (functionArity b - 1)])
            ++ " => \n\tmatch " ++ (intercalate ", " . map (\n -> "x" ++ show n) $ [0 .. (functionArity b - 1)]) ++ " with"
-           ++ intercalate "\n\t| " (map ppMatch . functionMatches $ b) ++ "\nend."
+           ++ (concatMap (((++) "\n\t\t| ") . ppMatch) . functionMatches $ b) ++ "\nend"
            
 ppMatch :: GallinaMatch -> String           
 ppMatch (GallinaMatch pats t) = (intercalate ", " . map ppPat $ pats) ++ " => " ++ ppTerm t
 
 ppPat :: GallinaPat -> String
 ppPat (GallinaPVar s) = s
+ppPat GallinaPWildCard = "_"
+ppPat (GallinaPApp s ps) = unwords (s : map ppPat ps)
 
 generalise :: GallinaType -> GallinaType
 generalise ty = let vars = ftv ty in if not (null vars) 

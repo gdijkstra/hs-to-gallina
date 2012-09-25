@@ -3,6 +3,7 @@ imports
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
+import Language.Haskell.Exts.Pretty
 --import Data.Set hiding (map)
 }
 
@@ -140,14 +141,116 @@ attr Match
 sem Matches
   | Nil  lhs.name = error "Matches list should never be empty"
   | Nil  lhs.arity = error "Matches list should never be empty"
-  | Nil  lhs.gallinaMatches = []
+
   | Cons lhs.name = @hd.name
   | Cons lhs.arity = @hd.arity
+  | Nil  lhs.gallinaMatches = []
   | Cons lhs.gallinaMatches = @hd.gallinaMatch : @tl.gallinaMatches
 
 sem Match                    
   | Match lhs.name = @name.name
-  | Match lhs.arity = length @pats
+  | Match lhs.arity = @pats.arity
+  | Match lhs.gallinaMatch = GallinaMatch @pats.gallinaPats @rhs.term
+
+attr Pats
+  syn gallinaPats :: {[GallinaPat]}
+  syn arity :: Int
+
+
+sem Pats
+  | Nil  lhs.gallinaPats = []
+  | Nil  lhs.arity = 0
+  | Cons lhs.gallinaPats = @hd.gallinaPat : @tl.gallinaPats
+  | Cons lhs.arity = 1 + @tl.arity
+
+attr Pat
+  syn gallinaPat :: GallinaPat
+
+sem Pat
+  | PVar       	 lhs.gallinaPat = GallinaPVar @name.name
+  | PLit	 lhs.gallinaPat = GallinaPVar (prettyPrint @literal)
+  | PNeg	 lhs.gallinaPat = error "unsupported neg"
+  | PNPlusK	 lhs.gallinaPat = error "unsupported nplusk"
+  | PInfixApp	 lhs.gallinaPat = error "unsupported infix"
+  | PApp	 lhs.gallinaPat = GallinaPApp @qname.name @pats.gallinaPats
+  | PTuple	 lhs.gallinaPat = error "unsupported tuple"
+  | PList	 lhs.gallinaPat = error "unsupported list"
+  | PParen	 lhs.gallinaPat = error "unsupported paren"
+  | PRec	 lhs.gallinaPat = error "unsupported record"
+  | PAsPat	 lhs.gallinaPat = error "unsupported aspat"
+  | PWildCard	 lhs.gallinaPat = GallinaPWildCard
+  | PIrrPat	 lhs.gallinaPat = error "unsupported irrpat"
+  | PatTypeSig	 lhs.gallinaPat = error "unsupported typesig"
+  | PViewPat	 lhs.gallinaPat = error "unsupported viewpat"
+  | PRPat	 lhs.gallinaPat = error "unsupported rpat"
+  | PXTag	 lhs.gallinaPat = error "unsupported xtag"
+  | PXETag	 lhs.gallinaPat = error "unsupported xetag"
+  | PXPcdata	 lhs.gallinaPat = error "unsupported cdata"
+  | PXPatTag	 lhs.gallinaPat = error "unsupported xpattag"
+  | PXRPats	 lhs.gallinaPat = error "unsupported xrpats"
+  | PExplTypeArg lhs.gallinaPat = error "unsupported expltypearg"
+  | PQuasiQuote	 lhs.gallinaPat = error "unsupported quasiquote"
+  | PBangPat	 lhs.gallinaPat = error "unsupported bangpat"
+
+
+attr Rhs 
+  syn term :: GallinaTerm
+
+sem Rhs
+  | UnGuardedRhs lhs.term = @exp.term
+  | GuardedRhss  lhs.term = error "unsupported guards"
+
+attr Exp
+  syn term :: GallinaTerm
+              
+sem Exp              
+  | Var	  lhs.term = GallinaVar @qname.name
+  -- | IPVar	 
+  | Con	  lhs.term = GallinaVar @qname.name
+  | Lit	  lhs.term = GallinaVar (prettyPrint @literal)
+  -- | InfixApp	 
+  -- | App	 
+  -- | NegApp	 
+  -- | Lambda	 
+  -- | Let	 
+  -- | If	 
+  -- | Case	
+  -- | Do	 
+  -- | MDo	 
+  -- | Tuple	 
+  -- | TupleSection	
+  -- | List	 
+  -- | Paren	 
+  -- | LeftSection	 
+  -- | RightSection	
+  -- | RecConstr	 
+  -- | RecUpdate	 
+  -- | EnumFrom	 
+  -- | EnumFromTo	 
+  -- | EnumFromThen	
+  -- | EnumFromThenTo	
+  -- | ListComp	 
+  -- | ParComp	 
+  -- | ExpTypeSig	 
+  -- | VarQuote	 
+  -- | TypQuote	 
+  -- | BracketExp	 
+  -- | SpliceExp	 
+  -- | QuasiQuote	 
+  -- | XTag	 
+  -- | XETag	 
+  -- | XPcdata	 
+  -- | XExpTag	 
+  -- | XChildTag	 
+  -- | CorePragma	 
+  -- | SCCPragma	 
+  -- | GenPragma	 
+  -- | Proc	 
+  -- | LeftArrApp	 
+  -- | RightArrApp	 
+  -- | LeftArrHighApp
+  -- | RightArrHighApp
+
 
 attr QualConDecls
   syn constrs :: {[GallinaConstructor]}
