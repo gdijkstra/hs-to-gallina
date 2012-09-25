@@ -105,4 +105,4 @@ ftv :: GallinaType -> [String]
 ftv (GallinaTyForall _ _) = error "ftv: foralls should not occur here"
 ftv (GallinaTyFun l r) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str) = return str
-ftv (GallinaTyCon str) = return str
+ftv (GallinaTyCon _) = []
