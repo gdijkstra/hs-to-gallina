@@ -199,7 +199,7 @@ sem Pat
   | PInfixApp       lhs.gallinaPat = error "unsupported infix"
   | PTuple          lhs.gallinaPat = error "unsupported tuple"
   | PList           lhs.gallinaPat = error "unsupported list"
-  | PParen          lhs.gallinaPat = error "unsupported paren"
+  | PParen          lhs.gallinaPat = @pat.gallinaPat
   | PRec            lhs.gallinaPat = error "unsupported record"
   | PAsPat          lhs.gallinaPat = error "unsupported aspat"
   | PIrrPat         lhs.gallinaPat = error "unsupported irrpat"

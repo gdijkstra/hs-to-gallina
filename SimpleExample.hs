@@ -11,11 +11,7 @@ data List a = Nil
 data Either a b = Left a
                 | Right b
 
-data Lam = Var String
-         | Abs (Lam -> Lam)
-
-
-idB, notB, andB :: B -> B
+idB, notB :: B -> B
 
 idB T = T
 idB F = F
@@ -23,6 +19,7 @@ idB F = F
 notB T = F
 notB F = T
 
+andB :: B -> B -> B
 andB T T = T
 andB _ _ = F
 
@@ -32,6 +29,6 @@ idPolymorphic a = a
 constPolymorphic :: a -> b -> a
 constPolymorphic a b = a
 
---minusOne :: Nat -> Nat
---minusOne Zero = Zero
---minusOne (Succ k) = k
+minusOne :: Nat -> Nat
+minusOne Zero = Zero
+minusOne (Succ k) = k

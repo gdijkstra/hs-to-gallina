@@ -59,9 +59,10 @@ ppVernacular :: Vernacular -> String
 ppVernacular = render . pp
 
 instance Pp Vernacular where
-  pp a = vsep [text "Module " <+> text (moduleName a) <> text "."
+  pp a = vsep [text "Module" <+> text (moduleName a) <> text "."
               , vsep (map pp (moduleDataTypes a))
               , vsep (map pp (moduleDefinitions a))
+              , text "End" <+> text (moduleName a) <> text "."
               ]
 
 instance Pp GallinaInductive where
@@ -69,7 +70,7 @@ instance Pp GallinaInductive where
           $+$ nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a))
                       <> text ".")
     where params = if (not (null pars))
-                   then lparen <+> hsep (map text pars) <+> text ": Type" <+> rparen
+                   then lparen <+> hsep (map text pars) <+> text ": Set" <+> rparen
                    else empty
           pars = inductiveParams a
 
@@ -82,7 +83,7 @@ instance Pp GallinaDefinition where
          $$ nest 2 (pp (defBody a) <> text ".")
     where ppDefType (GallinaTyForall vars ty) = (if not (null vars)
                                                      then text "{" <+> hsep (map text vars)
-                                                          <+> text ": Type" <+> text "}" 
+                                                          <+> text ": Set" <+> text "}" 
                                                      else empty) <+> text ":" <+> pp ty
           ppDefType ty = text ":" <+> pp ty
 
