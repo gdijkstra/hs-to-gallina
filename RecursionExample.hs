@@ -1,7 +1,7 @@
 module RecursionExample where
 
--- data Nat = Zero
---          | Succ Nat
+data Nat = Zero
+         | Succ Nat
 
 -- idNat :: Nat -> Nat
 -- idNat Zero = Zero
@@ -17,4 +17,3 @@ c c = d
 e = \b -> a
 
 d = e
-

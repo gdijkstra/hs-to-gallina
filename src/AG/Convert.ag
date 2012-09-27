@@ -122,7 +122,7 @@ sem Decl
 sem Decl                     
   | TypeDecl         lhs.dependencies = []
   | TypeFamDecl      lhs.dependencies = []
-  | DataDecl         lhs.dependencies = []
+  | DataDecl         lhs.dependencies = [(@name.name, @qualcondecls.dependencies)]
   | GDataDecl        lhs.dependencies = []
   | DataFamDecl      lhs.dependencies = []
   | TypeInsDecl      lhs.dependencies = []
@@ -403,49 +403,72 @@ sem Exp
 attr QualConDecls
   inh dataName :: String
   syn constrs :: {[GallinaConstructor]}
+  syn dependencies :: {[String]}
 
 sem QualConDecls
   | Nil  lhs.constrs = []
+         lhs.dependencies = []              
   | Cons lhs.constrs = @hd.constr : @tl.constrs
-             
+         lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+    
 attr QualConDecl ConDecl
   inh dataName :: String
   syn constr :: GallinaConstructor
-             
+  syn dependencies :: {[String]}
+           
 sem QualConDecl
   | QualConDecl lhs.constr = @condecl.constr
-                             
+                lhs.dependencies = @condecl.dependencies
+             
 sem ConDecl             
-  | ConDecl lhs.constr = GallinaConstructor @name.name @bangtypes.gallinaType
+  | ConDecl      lhs.constr = GallinaConstructor @name.name @bangtypes.gallinaType
+                 lhs.dependencies = @bangtypes.dependencies
   | InfixConDecl lhs.constr = error "Don't do this"
-  | RecDecl lhs.constr = error "Don't do this"
+                 lhs.dependencies = error "Don't do this"
+  | RecDecl      lhs.constr = error "Don't do this"
+                 lhs.dependencies = error "Don't do this"
 
 attr BangTypes
   inh dataName :: String
 
 attr BangTypes BangType Type
   syn gallinaType :: GallinaType
+  syn dependencies :: {[String]}
                      
 sem BangTypes
   | Nil  lhs.gallinaType = GallinaTyCon @lhs.dataName
+         lhs.dependencies = []
   | Cons lhs.gallinaType = GallinaTyFun @hd.gallinaType @tl.gallinaType
-                           
+         lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+                  
 sem BangType
   | BangedTy   lhs.gallinaType = error "bangedty not supported"
+               lhs.dependencies = error "bangedty not supported"                  
   | UnBangedTy lhs.gallinaType = @ty.gallinaType
+               lhs.dependencies = @ty.dependencies
   | UnpackedTy lhs.gallinaType = error "unpackedty not supported"
-                     
+               lhs.dependencies = error "unpackedty not supported"
 sem Type
   | TyForall lhs.gallinaType = error "foralls not supported"
+             lhs.dependencies = error "foralls not supported"
   | TyFun    lhs.gallinaType = GallinaTyFun @ty.gallinaType @ty1.gallinaType
+             lhs.dependencies = @ty.dependencies `difference` @ty1.dependencies
   | TyTuple  lhs.gallinaType = error "tuples not supported"
+             lhs.dependencies = error "tuples not supported" 
   | TyList   lhs.gallinaType = error "lists not supported"
+             lhs.dependencies = error "lists not supported"
   | TyApp    lhs.gallinaType = GallinaTyApp @ty.gallinaType @ty1.gallinaType
+             lhs.dependencies = @ty.dependencies ++ @ty1.dependencies
   | TyVar    lhs.gallinaType = GallinaTyVar @name.name
+             lhs.dependencies = [@name.name]
   | TyCon    lhs.gallinaType = GallinaTyCon @qname.name
+             lhs.dependencies = [@qname.name]
   | TyParen  lhs.gallinaType = @ty.gallinaType
+             lhs.dependencies = @ty.dependencies
   | TyInfix  lhs.gallinaType = error "infix not supported"
+             lhs.dependencies = error "infix not supported"
   | TyKind   lhs.gallinaType = error "kinds not supported"
+             lhs.dependencies = error "kinds not supported"
 
 attr Alts
   syn matches :: {[GallinaMatch]}
