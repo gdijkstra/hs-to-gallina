@@ -3,9 +3,6 @@ module Gallina where
 import Data.List
 import Text.PrettyPrint.HughesPJ
 
-class Pp a where
-  pp :: a -> Doc
-
 data Vernacular = Vernacular { moduleName :: String 
                              , moduleDataTypes :: [GallinaInductive]
                              , moduleDefinitions :: [GallinaDefinition]
@@ -22,12 +19,14 @@ data GallinaConstructor = GallinaConstructor { constrName :: String
 
 data GallinaDefinition = GallinaDefinition { defName :: String
                                            , defType :: GallinaType
-                                           , defBody :: GallinaFunBody
+                                           , defBody :: GallinaBody
                                            }
 
-data GallinaFunBody = GallinaFunBody { funArity :: Int
-                                     , funMatches :: [GallinaMatch]
-                                     }
+data GallinaBody = GallinaFunBody { funArity :: Int
+                                  , funMatches :: [GallinaMatch]
+                                  }
+                 | GallinaPatBody GallinaTerm
+
 
 data GallinaMatch = GallinaMatch { matchPats :: [GallinaPat] 
                                  , matchTerm :: GallinaTerm
@@ -44,10 +43,22 @@ data GallinaType
      | GallinaTyVar String
      | GallinaTyCon String
 
-
 data GallinaTerm = GallinaVar String
+                 | GallinaApp GallinaTerm GallinaTerm
+                 | GallinaLam [String] GallinaTerm
+                 | GallinaCase GallinaTerm [GallinaMatch]
 
 -- Pretty printing
+
+class Pp a where
+  pp :: a -> Doc
+  ppPrec :: Int -> a -> Doc
+  
+  pp = ppPrec 0
+  ppPrec _ = pp
+
+parensIf :: Bool -> Doc -> Doc
+parensIf b = if b then parens else id
 
 commas :: [Doc] -> Doc
 commas = hsep . intersperse (text ",") -- TODO: fix unnecessary spaces
@@ -87,33 +98,43 @@ instance Pp GallinaDefinition where
                                                      else empty) <+> text ":" <+> pp ty
           ppDefType ty = text ":" <+> pp ty
 
-instance Pp GallinaFunBody where
-  pp a = text "fun" 
-          <+> hsep args
-          <+> text "=>" 
-          $$ nest 2 (text "match" <+> commas args <+> text "with" 
-                      $+$ nest 2 (vcat (map pp (funMatches a)))
-                      $+$ text "end")
-    where args = (map (\n -> text "x" <> text (show n)) [0 .. (funArity a - 1)])
+instance Pp GallinaBody where
+  pp (GallinaFunBody arity ms) = text "fun" 
+                                 <+> hsep args
+                                 <+> text "=>" 
+                                 $$ nest 2 (text "match" <+> commas args <+> text "with" 
+                                            $+$ nest 2 (vcat (map pp ms))
+                                            $+$ text "end")
+    where args = (map (\n -> text "x" <> text (show n)) [0 .. (arity - 1)])
+  pp (GallinaPatBody t) = pp t
 
 instance Pp GallinaMatch where
   pp a = text "|" <+> commas (map pp (matchPats a)) 
-             <+> text "=>" <+> pp (matchTerm a)
+         <+> text "=>" <+> pp (matchTerm a)
 
 instance Pp GallinaPat where
-  pp (GallinaPVar s) = text s
-  pp (GallinaPApp s ps) = hsep (text s : map pp ps)
-  pp GallinaPWildCard = text "_"
+  ppPrec _ (GallinaPVar s) = text s
+  ppPrec p (GallinaPApp s ps) = parensIf (p > 0 && not (null ps)) $ hsep (text s : map (ppPrec 1) ps)
+  ppPrec _ GallinaPWildCard = text "_"
 
+-- TODO: do something with vars in forall case.
 instance Pp GallinaType where
-  pp (GallinaTyForall _ ty) = pp ty -- TODO: do smth with vars
-  pp (GallinaTyFun l r) = pp l <+> text "->" <+> pp r -- TODO: parentheses
-  pp (GallinaTyApp l r) = pp l <+> pp r -- TODO: parentheses
-  pp (GallinaTyVar s) = text s
-  pp (GallinaTyCon s) = text s
+  ppPrec p (GallinaTyForall _ ty) = parensIf (p > 0) $ pp ty
+  ppPrec p (GallinaTyFun l r) = parensIf (p > 0) $ ppPrec 1 l <+> text "->" <+> pp r
+  ppPrec p (GallinaTyApp l r) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
+  ppPrec _ (GallinaTyVar s) = text s
+  ppPrec _ (GallinaTyCon s) = text s
   
 instance Pp GallinaTerm where  
-  pp (GallinaVar s) = text s
+  ppPrec _ (GallinaVar s) = text s
+  ppPrec p (GallinaApp l r) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
+  ppPrec p (GallinaLam v e) = parensIf (p > 1) $ text "fun" 
+                              <+> hsep (map text v)
+                              <+> text "=>"
+                              <+> nest 2 (pp e)
+  ppPrec _ (GallinaCase e ms) = text "match" <+> pp e <+> text "with" 
+                                $+$ nest 2 (vcat (map pp ms))
+                                $+$ text "end"
 
 generalise :: GallinaType -> GallinaType
 generalise ty = let vars = ftv ty in if not (null vars) 

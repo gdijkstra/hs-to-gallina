@@ -94,7 +94,9 @@ sem Decl
   | FunBind          lhs.gallinaDecl = return $ case M.lookup @matches.name @lhs.types of
                                          Nothing -> error "this should not happen"
                                          (Just t) -> GallinaDefinitionDecl $ GallinaDefinition @matches.name t (GallinaFunBody @matches.arity @matches.gallinaMatches)
-  | PatBind          lhs.gallinaDecl = []
+  | PatBind          lhs.gallinaDecl = return $ case M.lookup @pat.var @lhs.types of
+                                         Nothing -> error "this should not happen"
+                                         (Just t) -> GallinaDefinitionDecl $ GallinaDefinition @pat.var t (GallinaPatBody @rhs.term)
   | ForImp           lhs.gallinaDecl = []
   | ForExp           lhs.gallinaDecl = []
   | RulePragmaDecl   lhs.gallinaDecl = []
@@ -177,43 +179,71 @@ sem Match
 
 attr Pats
   syn gallinaPats :: {[GallinaPat]}
+  syn vars :: {[String]}
   syn arity :: Int
 
 
 sem Pats
   | Nil  lhs.gallinaPats = []
-  | Nil  lhs.arity = 0
+         lhs.vars = []
+         lhs.arity = 0
   | Cons lhs.gallinaPats = @hd.gallinaPat : @tl.gallinaPats
-  | Cons lhs.arity = 1 + @tl.arity
+         lhs.vars = @hd.var : @tl.vars
+         lhs.arity = 1 + @tl.arity
 
 attr Pat
   syn gallinaPat :: GallinaPat
+  syn var :: String
 
 sem Pat
   | PVar            lhs.gallinaPat = GallinaPVar @name.name
+                    lhs.var = @name.name
   | PLit            lhs.gallinaPat = GallinaPVar (prettyPrint @literal)
+                    lhs.var = error "unsupported pattern in lambda"
   | PApp            lhs.gallinaPat = GallinaPApp @qname.name @pats.gallinaPats
+                    lhs.var = error "unsupported pattern in lambda"
   | PWildCard       lhs.gallinaPat = GallinaPWildCard
+                    lhs.var = error "unsupported pattern in lambda"
   | PNeg            lhs.gallinaPat = error "unsupported neg"
+                    lhs.var = error "unsupported pattern in lambda"
   | PNPlusK         lhs.gallinaPat = error "unsupported nplusk"
+                    lhs.var = error "unsupported pattern in lambda"
   | PInfixApp       lhs.gallinaPat = error "unsupported infix"
+                    lhs.var = error "unsupported pattern in lambda"
   | PTuple          lhs.gallinaPat = error "unsupported tuple"
+                    lhs.var = error "unsupported pattern in lambda"
   | PList           lhs.gallinaPat = error "unsupported list"
+                    lhs.var = error "unsupported pattern in lambda"
   | PParen          lhs.gallinaPat = @pat.gallinaPat
+                    lhs.var = @pat.var
   | PRec            lhs.gallinaPat = error "unsupported record"
+                    lhs.var = error "unsupported pattern in lambda"
   | PAsPat          lhs.gallinaPat = error "unsupported aspat"
+                    lhs.var = error "unsupported pattern in lambda"
   | PIrrPat         lhs.gallinaPat = error "unsupported irrpat"
+                    lhs.var = error "unsupported pattern in lambda"
   | PatTypeSig      lhs.gallinaPat = error "unsupported typesig"
+                    lhs.var = error "unsupported pattern in lambda"
   | PViewPat        lhs.gallinaPat = error "unsupported viewpat"
+                    lhs.var = error "unsupported pattern in lambda"
   | PRPat           lhs.gallinaPat = error "unsupported rpat"
+                    lhs.var = error "unsupported pattern in lambda"
   | PXTag           lhs.gallinaPat = error "unsupported xtag"
+                    lhs.var = error "unsupported pattern in lambda"
   | PXETag          lhs.gallinaPat = error "unsupported xetag"
+                    lhs.var = error "unsupported pattern in lambda"
   | PXPcdata        lhs.gallinaPat = error "unsupported cdata"
+                    lhs.var = error "unsupported pattern in lambda"
   | PXPatTag        lhs.gallinaPat = error "unsupported xpattag"
+                    lhs.var = error "unsupported pattern in lambda"
   | PXRPats         lhs.gallinaPat = error "unsupported xrpats"
+                    lhs.var = error "unsupported pattern in lambda"
   | PExplTypeArg    lhs.gallinaPat = error "unsupported expltypearg"
+                    lhs.var = error "unsupported pattern in lambda"
   | PQuasiQuote     lhs.gallinaPat = error "unsupported quasiquote"
+                    lhs.var = error "unsupported pattern in lambda"
   | PBangPat        lhs.gallinaPat = error "unsupported bangpat"
+                    lhs.var = error "unsupported pattern in lambda"
 
 
 attr Rhs
@@ -232,12 +262,12 @@ sem Exp
   | Lit             lhs.term = GallinaVar (prettyPrint @literal)
   | IPVar           lhs.term = error "Unsupported: implicit var"
   | InfixApp        lhs.term = error "Unsupported: infix app"
-  | App             lhs.term = error "Unsupported: app"
+  | App             lhs.term = GallinaApp @exp.term @exp1.term
   | NegApp          lhs.term = error "Unsupported: negate app"
-  | Lambda          lhs.term = error "Unsupported: lambda"
+  | Lambda          lhs.term = GallinaLam @pats.vars @exp.term
   | Let             lhs.term = error "Unsupported: let"
   | If              lhs.term = error "Unsupported: if"
-  | Case            lhs.term = error "Unsupported: case"
+  | Case            lhs.term = GallinaCase @exp.term @alts.matches
   | Do              lhs.term = error "Unsupported: do"
   | MDo             lhs.term = error "Unsupported: mdo"
   | Tuple           lhs.term = error "Unsupported: tuple"
@@ -321,6 +351,26 @@ sem Type
   | TyParen  lhs.gallinaType = @ty.gallinaType
   | TyInfix  lhs.gallinaType = error "infix not supported"
   | TyKind   lhs.gallinaType = error "kinds not supported"
+
+attr Alts
+  syn matches :: {[GallinaMatch]}
+
+attr Alt
+  syn match :: GallinaMatch
+                 
+sem Alts
+  | Nil  lhs.matches = []
+  | Cons lhs.matches = @hd.match : @tl.matches
+
+sem Alt
+  | Alt lhs.match = GallinaMatch [@pat.gallinaPat] @guardedalts.term
+
+attr GuardedAlts
+  syn term :: GallinaTerm
+
+sem GuardedAlts              
+  | UnGuardedAlt lhs.term = @exp.term
+  | GuardedAlts  lhs.term = error "Guards not supported"
 
 -- Missing rules for inherited attributes
 
