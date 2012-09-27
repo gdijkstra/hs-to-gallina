@@ -4,10 +4,16 @@ import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
 import Language.Haskell.Exts.Pretty
+import Debug.Trace
 
 data GallinaDecl = GallinaInductiveDecl GallinaInductive
                  | GallinaDefinitionDecl GallinaDefinition
 
+}
+
+{
+difference :: Eq a => [a] -> [a] -> [a]
+difference b a = filter (`notElem` b) a
 }
 
 attr Module
@@ -20,11 +26,12 @@ sem Module
                                 toDefinition (GallinaDefinitionDecl d) = Just d -- tmp
                                 toDefinition _ = Nothing -- tmp
                                 defs = mapMaybe toDefinition @decls.gallinaDecls -- tmp
-                            in Vernacular { moduleName = @modulename.name
+                            in trace ("deps: " ++ show @decls.dependencies) 
+                               $
+                               Vernacular { moduleName = @modulename.name
                                           , moduleDataTypes = dataDecls
                                           , moduleDefinitions = defs
                                           }
-                            
   | Module decls.types = M.fromList @decls.typeDecls
 
 attr ModuleName Name QName
@@ -53,20 +60,23 @@ attr Decls
   syn gallinaDecls :: {[GallinaDecl]}
   syn typeDecls :: {[(String, GallinaType)]}
   inh types :: {Map String GallinaType}
+  syn dependencies :: {[(String, [String])]}
+
 
 sem Decls
   | Nil  lhs.gallinaDecls = []
+         lhs.dependencies = []
+         lhs.typeDecls = []
   | Cons lhs.gallinaDecls = @hd.gallinaDecl ++ @tl.gallinaDecls
-
-sem Decls
-  | Nil  lhs.typeDecls = []
-  | Cons lhs.typeDecls = @hd.typeDecls ++ @tl.typeDecls
-  | Cons hd.types = @lhs.types
+         lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+         lhs.typeDecls = @hd.typeDecls ++ @tl.typeDecls
+         hd.types = @lhs.types
 
 attr Decl                          
   syn gallinaDecl :: {[GallinaDecl]} -- TODO: change this back to non-list type
   syn typeDecls :: {[(String, GallinaType)]}
   inh types :: {Map String GallinaType}
+  syn dependencies :: {[(String, [String])]}
 
 {
 ppParams :: [String] -> String
@@ -108,6 +118,36 @@ sem Decl
   | SpecInlineSig    lhs.gallinaDecl = []
   | InstSig          lhs.gallinaDecl = []
   | AnnPragma        lhs.gallinaDecl = []
+
+sem Decl                     
+  | TypeDecl         lhs.dependencies = []
+  | TypeFamDecl      lhs.dependencies = []
+  | DataDecl         lhs.dependencies = []
+  | GDataDecl        lhs.dependencies = []
+  | DataFamDecl      lhs.dependencies = []
+  | TypeInsDecl      lhs.dependencies = []
+  | DataInsDecl      lhs.dependencies = []
+  | GDataInsDecl     lhs.dependencies = []
+  | ClassDecl        lhs.dependencies = []
+  | InstDecl         lhs.dependencies = []
+  | DerivDecl        lhs.dependencies = []
+  | InfixDecl        lhs.dependencies = []
+  | DefaultDecl      lhs.dependencies = []
+  | SpliceDecl       lhs.dependencies = []
+  | TypeSig          lhs.dependencies = []
+  | FunBind          lhs.dependencies = [(@matches.name, @matches.dependencies)]
+  | PatBind          lhs.dependencies = [(@pat.var, @rhs.dependencies)]
+  | ForImp           lhs.dependencies = []
+  | ForExp           lhs.dependencies = []
+  | RulePragmaDecl   lhs.dependencies = []
+  | DeprPragmaDecl   lhs.dependencies = []
+  | WarnPragmaDecl   lhs.dependencies = []
+  | InlineSig        lhs.dependencies = []
+  | InlineConlikeSig lhs.dependencies = []
+  | SpecSig          lhs.dependencies = []
+  | SpecInlineSig    lhs.dependencies = []
+  | InstSig          lhs.dependencies = []
+  | AnnPragma        lhs.dependencies = []
 
 sem Decl
   | TypeDecl         lhs.typeDecls = []
@@ -159,23 +199,27 @@ attr Matches Match
 
 attr Matches
   syn gallinaMatches :: {[GallinaMatch]}
+  syn dependencies :: {[String]}
 
 attr Match
   syn gallinaMatch :: GallinaMatch
+  syn dependencies :: {[String]}
                         
 sem Matches
   | Nil  lhs.name = error "Matches list should never be empty"
-  | Nil  lhs.arity = error "Matches list should never be empty"
-
+         lhs.arity = error "Matches list should never be empty"
+         lhs.dependencies = []
+         lhs.gallinaMatches = []
   | Cons lhs.name = @hd.name
-  | Cons lhs.arity = @hd.arity
-  | Nil  lhs.gallinaMatches = []
-  | Cons lhs.gallinaMatches = @hd.gallinaMatch : @tl.gallinaMatches
+         lhs.arity = @hd.arity
+         lhs.gallinaMatches = @hd.gallinaMatch : @tl.gallinaMatches
+         lhs.dependencies = @hd.dependencies ++ @tl.dependencies
 
 sem Match                    
   | Match lhs.name = @name.name
-  | Match lhs.arity = @pats.arity
-  | Match lhs.gallinaMatch = GallinaMatch @pats.gallinaPats @rhs.term
+          lhs.arity = @pats.arity
+          lhs.gallinaMatch = GallinaMatch @pats.gallinaPats @rhs.term
+          lhs.dependencies = (concatMap patVars @pats.gallinaPats) `difference` @rhs.dependencies
 
 attr Pats
   syn gallinaPats :: {[GallinaPat]}
@@ -248,62 +292,113 @@ sem Pat
 
 attr Rhs
   syn term :: GallinaTerm
+  syn dependencies :: {[String]}
 
 sem Rhs
   | UnGuardedRhs lhs.term = @exp.term
+                 lhs.dependencies = @exp.dependencies
   | GuardedRhss  lhs.term = error "unsupported guards"
+                 lhs.dependencies = error "unsupported guards"
 
 attr Exp
   syn term :: GallinaTerm
+  syn dependencies :: {[String]}
               
 sem Exp              
   | Var             lhs.term = GallinaVar @qname.name
+                    lhs.dependencies = [@qname.name]
   | Con             lhs.term = GallinaVar @qname.name
+                    lhs.dependencies = [@qname.name]
   | Lit             lhs.term = GallinaVar (prettyPrint @literal)
-  | IPVar           lhs.term = error "Unsupported: implicit var"
-  | InfixApp        lhs.term = error "Unsupported: infix app"
-  | App             lhs.term = GallinaApp @exp.term @exp1.term
-  | NegApp          lhs.term = error "Unsupported: negate app"
-  | Lambda          lhs.term = GallinaLam @pats.vars @exp.term
-  | Let             lhs.term = error "Unsupported: let"
-  | If              lhs.term = error "Unsupported: if"
-  | Case            lhs.term = GallinaCase @exp.term @alts.matches
-  | Do              lhs.term = error "Unsupported: do"
-  | MDo             lhs.term = error "Unsupported: mdo"
-  | Tuple           lhs.term = error "Unsupported: tuple"
-  | TupleSection    lhs.term = error "Unsupported: tuple section"
-  | List            lhs.term = error "Unsupported: list"
-  | Paren           lhs.term = error "Unsupported: parentheses"
-  | LeftSection     lhs.term = error "Unsupported: left section"
-  | RightSection    lhs.term = error "Unsupported: right section"
-  | RecConstr       lhs.term = error "Unsupported: record constructor"
-  | RecUpdate       lhs.term = error "Unsupported: record update"
-  | EnumFrom        lhs.term = error "Unsupported: enum from"
-  | EnumFromTo      lhs.term = error "Unsupported: enum from to"
-  | EnumFromThen    lhs.term = error "Unsupported: enum from then"
-  | EnumFromThenTo  lhs.term = error "Unsupported: enum from then to"
-  | ListComp        lhs.term = error "Unsupported: list comp"
-  | ParComp         lhs.term = error "Unsupported"
-  | ExpTypeSig      lhs.term = error "Unsupported"
-  | VarQuote        lhs.term = error "Unsupported"
-  | TypQuote        lhs.term = error "Unsupported"
-  | BracketExp      lhs.term = error "Unsupported"
-  | SpliceExp       lhs.term = error "Unsupported"
-  | QuasiQuote      lhs.term = error "Unsupported"
-  | XTag            lhs.term = error "Unsupported"
-  | XETag           lhs.term = error "Unsupported"
-  | XPcdata         lhs.term = error "Unsupported"
-  | XExpTag         lhs.term = error "Unsupported"
-  | XChildTag       lhs.term = error "Unsupported"
-  | CorePragma      lhs.term = error "Unsupported"
-  | SCCPragma       lhs.term = error "Unsupported"
-  | GenPragma       lhs.term = error "Unsupported"
-  | Proc            lhs.term = error "Unsupported"
-  | LeftArrApp      lhs.term = error "Unsupported"
-  | RightArrApp     lhs.term = error "Unsupported"
-  | LeftArrHighApp  lhs.term = error "Unsupported"
-  | RightArrHighApp lhs.term = error "Unsupported"
+                    lhs.dependencies = [prettyPrint @literal]
 
+  | App             lhs.term = GallinaApp @exp.term @exp1.term
+                    lhs.dependencies = @exp.dependencies ++ @exp1.dependencies
+
+  | Lambda          lhs.term = GallinaLam @pats.vars @exp.term
+                    lhs.dependencies = @pats.vars `difference` @exp.dependencies
+  | Case            lhs.term = GallinaCase @exp.term @alts.matches
+                    lhs.dependencies = @exp.dependencies ++ @alts.dependencies
+  | NegApp          lhs.term = error "Unsupported: negate app"
+                    lhs.dependencies = error "Unsupported: "
+  | InfixApp        lhs.term = error "Unsupported: infix app"
+                    lhs.dependencies = error "Unsupported: "
+  | IPVar           lhs.term = error "Unsupported: implicit var"
+                    lhs.dependencies = error "Unsupported: "
+  | Let             lhs.term = error "Unsupported: let"
+                    lhs.dependencies = error "Unsupported: "
+  | If              lhs.term = error "Unsupported: if"
+                    lhs.dependencies = error "Unsupported: "
+  | Do              lhs.term = error "Unsupported: do"
+                    lhs.dependencies = error "Unsupported: "
+  | MDo             lhs.term = error "Unsupported: mdo"
+                    lhs.dependencies = error "Unsupported: "
+  | Tuple           lhs.term = error "Unsupported: tuple"
+                    lhs.dependencies = error "Unsupported: "
+  | TupleSection    lhs.term = error "Unsupported: tuple section"
+                    lhs.dependencies = error "Unsupported: "
+  | List            lhs.term = error "Unsupported: list"
+                    lhs.dependencies = error "Unsupported: "
+  | Paren           lhs.term = @exp.term
+                    lhs.dependencies = @exp.dependencies
+  | LeftSection     lhs.term = error "Unsupported: left section"
+                    lhs.dependencies = error "Unsupported: "
+  | RightSection    lhs.term = error "Unsupported: right section"
+                    lhs.dependencies = error "Unsupported: "
+  | RecConstr       lhs.term = error "Unsupported: record constructor"
+                    lhs.dependencies = error "Unsupported: "
+  | RecUpdate       lhs.term = error "Unsupported: record update"
+                    lhs.dependencies = error "Unsupported: "
+  | EnumFrom        lhs.term = error "Unsupported: enum from"
+                    lhs.dependencies = error "Unsupported: "
+  | EnumFromTo      lhs.term = error "Unsupported: enum from to"
+                    lhs.dependencies = error "Unsupported: "
+  | EnumFromThen    lhs.term = error "Unsupported: enum from then"
+                    lhs.dependencies = error "Unsupported: "
+  | EnumFromThenTo  lhs.term = error "Unsupported: enum from then to"
+                    lhs.dependencies = error "Unsupported: "
+  | ListComp        lhs.term = error "Unsupported: list comp"
+                    lhs.dependencies = error "Unsupported: "
+  | ParComp         lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | ExpTypeSig      lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | VarQuote        lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | TypQuote        lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | BracketExp      lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | SpliceExp       lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | QuasiQuote      lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | XTag            lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | XETag           lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | XPcdata         lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | XExpTag         lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | XChildTag       lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | CorePragma      lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | SCCPragma       lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | GenPragma       lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | Proc            lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | LeftArrApp      lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | RightArrApp     lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | LeftArrHighApp  lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
+  | RightArrHighApp lhs.term = error "Unsupported"
+                    lhs.dependencies = error "Unsupported: "
 
 attr QualConDecls
   inh dataName :: String
@@ -354,23 +449,31 @@ sem Type
 
 attr Alts
   syn matches :: {[GallinaMatch]}
+  syn dependencies :: {[String]}
 
 attr Alt
   syn match :: GallinaMatch
-                 
+  syn dependencies :: {[String]}                 
+
 sem Alts
   | Nil  lhs.matches = []
+         lhs.dependencies = []              
   | Cons lhs.matches = @hd.match : @tl.matches
+         lhs.dependencies = @hd.dependencies ++ @tl.dependencies
 
 sem Alt
   | Alt lhs.match = GallinaMatch [@pat.gallinaPat] @guardedalts.term
-
+        lhs.dependencies = patVars @pat.gallinaPat `difference` @guardedalts.dependencies
+ 
 attr GuardedAlts
   syn term :: GallinaTerm
+  syn dependencies :: {[String]}                 
 
 sem GuardedAlts              
   | UnGuardedAlt lhs.term = @exp.term
+                 lhs.dependencies = @exp.dependencies           
   | GuardedAlts  lhs.term = error "Guards not supported"
+                 lhs.dependencies = error "Guards not supported"
 
 -- Missing rules for inherited attributes
 

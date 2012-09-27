@@ -1,6 +1,7 @@
 CABAL-CONFIGURE-FLAGS := --user
 CABAL-BUILD-FLAGS     :=
-TESTFILE=SimpleExample.hs
+#TESTFILE=SimpleExample.hs
+TESTFILE=RecursionExample.hs
 TESTFILEBN=`basename $(TESTFILE) ".hs"`
 
 default : test

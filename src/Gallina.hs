@@ -148,6 +148,11 @@ ftv (GallinaTyApp l r) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str) = return str
 ftv (GallinaTyCon _) = []
 
+patVars :: GallinaPat -> [String]
+patVars (GallinaPVar s) = [s]
+patVars (GallinaPApp s ps) = s : concatMap patVars ps
+patVars GallinaPWildCard = []
+
 -- TODO: remove this, someday.
 testDefinition :: GallinaDefinition
 testDefinition = GallinaDefinition "const" (GallinaTyForall ["a", "b"] (GallinaTyFun (GallinaTyVar "a") (GallinaTyFun (GallinaTyVar "b") (GallinaTyVar "a")))) body
