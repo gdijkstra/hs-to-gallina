@@ -5,6 +5,8 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Language.Haskell.Exts.Pretty
 import Debug.Trace
+import Data.Graph
+import Data.List
 
 data GallinaDecl = GallinaInductiveDecl GallinaInductive
                  | GallinaDefinitionDecl GallinaDefinition
@@ -14,19 +16,48 @@ data GallinaDecl = GallinaInductiveDecl GallinaInductive
 {
 difference :: Eq a => [a] -> [a] -> [a]
 difference b a = filter (`notElem` b) a
+
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
+
+snd3 :: (a, b, c) -> b
+snd3 (_, b, _) = b
+
+trd3 :: (a, b, c) -> c
+trd3 (_, _, c) = c
+
+sndTrd3 :: (a, b, c) -> (b, c)
+sndTrd3 (_, b, c) = (b, c)
+
+declName :: GallinaDecl -> String
+declName (GallinaInductiveDecl d) = inductiveName d
+declName (GallinaDefinitionDecl d) = defName d
+
+ppSCC :: SCC GallinaDecl -> String
+ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
+ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
+
+typeDeps :: GallinaType -> [String]
+typeDeps (GallinaTyForall vars t) = vars `difference` typeDeps t
+typeDeps (GallinaTyFun l r) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyApp l r) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyVar v) = [v]
+typeDeps (GallinaTyCon v) = [v]
+
 }
 
 attr Module
   syn vernacular :: Vernacular
                  
 sem Module                 
-  | Module lhs.vernacular = let dataDecls = mapMaybe toDataType @decls.gallinaDecls
+  | Module lhs.vernacular = let gallinaDecls = map fst3 @decls.declsDeps
+                                dataDecls = mapMaybe toDataType gallinaDecls
                                 toDataType (GallinaInductiveDecl d) = Just d -- tmp
                                 toDataType _ = Nothing -- tmp
                                 toDefinition (GallinaDefinitionDecl d) = Just d -- tmp
                                 toDefinition _ = Nothing -- tmp
-                                defs = mapMaybe toDefinition @decls.gallinaDecls -- tmp
-                            in trace ("deps: " ++ show @decls.dependencies) 
+                                defs = mapMaybe toDefinition gallinaDecls -- tmp
+                            in trace (show . map ppSCC . stronglyConnComp $ @decls.declsDeps)
                                $
                                Vernacular { moduleName = @modulename.name
                                           , moduleDataTypes = dataDecls
@@ -57,97 +88,91 @@ sem Names
   | Cons lhs.names = @hd.name : @tl.names
 
 attr Decls
-  syn gallinaDecls :: {[GallinaDecl]}
+  syn declsDeps :: {[(GallinaDecl, String, [String])]}
   syn typeDecls :: {[(String, GallinaType)]}
   inh types :: {Map String GallinaType}
-  syn dependencies :: {[(String, [String])]}
 
 
 sem Decls
-  | Nil  lhs.gallinaDecls = []
-         lhs.dependencies = []
+  | Nil  lhs.declsDeps = []
          lhs.typeDecls = []
-  | Cons lhs.gallinaDecls = @hd.gallinaDecl ++ @tl.gallinaDecls
-         lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+  | Cons lhs.declsDeps = @hd.declsDeps ++ @tl.declsDeps
          lhs.typeDecls = @hd.typeDecls ++ @tl.typeDecls
          hd.types = @lhs.types
 
 attr Decl                          
-  syn gallinaDecl :: {[GallinaDecl]} -- TODO: change this back to non-list type
+  syn declsDeps :: {[(GallinaDecl, String, [String])]}
   syn typeDecls :: {[(String, GallinaType)]}
   inh types :: {Map String GallinaType}
-  syn dependencies :: {[(String, [String])]}
 
 {
 ppParams :: [String] -> String
 ppParams [] = ""
 ppParams xs@(_:_) = ' ' : unwords xs
+
+mkFunDefDecl :: String -> Int -> GallinaType -> [GallinaMatch] -> GallinaDecl
+mkFunDefDecl name arity t ms = GallinaDefinitionDecl $ 
+                               GallinaDefinition name t (GallinaFunBody arity ms)
+                        
+mkPatBindDefDecl :: String -> GallinaType -> GallinaTerm -> GallinaDecl     
+mkPatBindDefDecl name t body = GallinaDefinitionDecl $
+                               GallinaDefinition name t (GallinaPatBody body)
 }
 
 sem Decl                     
-  | TypeDecl         lhs.gallinaDecl = []
-  | TypeFamDecl      lhs.gallinaDecl = []
-  | DataDecl         lhs.gallinaDecl = [GallinaInductiveDecl $ GallinaInductive @name.name @tyvarbinds.params @qualcondecls.constrs]
-  | DataDecl         qualcondecls.dataName = @name.name ++ ppParams @tyvarbinds.params
-  | GDataDecl        lhs.gallinaDecl = []
-  | DataFamDecl      lhs.gallinaDecl = []
-  | TypeInsDecl      lhs.gallinaDecl = []
-  | DataInsDecl      lhs.gallinaDecl = []
-  | GDataInsDecl     lhs.gallinaDecl = []
-  | ClassDecl        lhs.gallinaDecl = []
-  | InstDecl         lhs.gallinaDecl = []
-  | DerivDecl        lhs.gallinaDecl = []
-  | InfixDecl        lhs.gallinaDecl = []
-  | DefaultDecl      lhs.gallinaDecl = []
-  | SpliceDecl       lhs.gallinaDecl = []
-  | TypeSig          lhs.gallinaDecl = []
-  | FunBind          lhs.gallinaDecl = return $ case M.lookup @matches.name @lhs.types of
-                                         Nothing -> error "this should not happen"
-                                         (Just t) -> GallinaDefinitionDecl $ GallinaDefinition @matches.name t (GallinaFunBody @matches.arity @matches.gallinaMatches)
-  | PatBind          lhs.gallinaDecl = return $ case M.lookup @pat.var @lhs.types of
-                                         Nothing -> error "this should not happen"
-                                         (Just t) -> GallinaDefinitionDecl $ GallinaDefinition @pat.var t (GallinaPatBody @rhs.term)
-  | ForImp           lhs.gallinaDecl = []
-  | ForExp           lhs.gallinaDecl = []
-  | RulePragmaDecl   lhs.gallinaDecl = []
-  | DeprPragmaDecl   lhs.gallinaDecl = []
-  | WarnPragmaDecl   lhs.gallinaDecl = []
-  | InlineSig        lhs.gallinaDecl = []
-  | InlineConlikeSig lhs.gallinaDecl = []
-  | SpecSig          lhs.gallinaDecl = []
-  | SpecInlineSig    lhs.gallinaDecl = []
-  | InstSig          lhs.gallinaDecl = []
-  | AnnPragma        lhs.gallinaDecl = []
-
-sem Decl                     
-  | TypeDecl         lhs.dependencies = []
-  | TypeFamDecl      lhs.dependencies = []
-  | DataDecl         lhs.dependencies = [(@name.name, @qualcondecls.dependencies)]
-  | GDataDecl        lhs.dependencies = []
-  | DataFamDecl      lhs.dependencies = []
-  | TypeInsDecl      lhs.dependencies = []
-  | DataInsDecl      lhs.dependencies = []
-  | GDataInsDecl     lhs.dependencies = []
-  | ClassDecl        lhs.dependencies = []
-  | InstDecl         lhs.dependencies = []
-  | DerivDecl        lhs.dependencies = []
-  | InfixDecl        lhs.dependencies = []
-  | DefaultDecl      lhs.dependencies = []
-  | SpliceDecl       lhs.dependencies = []
-  | TypeSig          lhs.dependencies = []
-  | FunBind          lhs.dependencies = [(@matches.name, @matches.dependencies)]
-  | PatBind          lhs.dependencies = [(@pat.var, @rhs.dependencies)]
-  | ForImp           lhs.dependencies = []
-  | ForExp           lhs.dependencies = []
-  | RulePragmaDecl   lhs.dependencies = []
-  | DeprPragmaDecl   lhs.dependencies = []
-  | WarnPragmaDecl   lhs.dependencies = []
-  | InlineSig        lhs.dependencies = []
-  | InlineConlikeSig lhs.dependencies = []
-  | SpecSig          lhs.dependencies = []
-  | SpecInlineSig    lhs.dependencies = []
-  | InstSig          lhs.dependencies = []
-  | AnnPragma        lhs.dependencies = []
+  | TypeDecl         lhs.declsDeps = []
+  | TypeFamDecl      lhs.declsDeps = []
+  | DataDecl         loc.gallinaDecl = GallinaInductiveDecl $ 
+                                       GallinaInductive @name.name 
+                                                        @tyvarbinds.params
+                                                        @qualcondecls.constrs 
+                     lhs.declsDeps = return ( @gallinaDecl 
+                                            , @name.name 
+                                            , @qualcondecls.dependencies
+                                            )
+                     qualcondecls.dataName = @name.name ++ ppParams @tyvarbinds.params
+  | GDataDecl        lhs.declsDeps = []
+  | DataFamDecl      lhs.declsDeps = []
+  | TypeInsDecl      lhs.declsDeps = []
+  | DataInsDecl      lhs.declsDeps = []
+  | GDataInsDecl     lhs.declsDeps = []
+  | ClassDecl        lhs.declsDeps = []
+  | InstDecl         lhs.declsDeps = []
+  | DerivDecl        lhs.declsDeps = []
+  | InfixDecl        lhs.declsDeps = []
+  | DefaultDecl      lhs.declsDeps = []
+  | SpliceDecl       lhs.declsDeps = []
+  | TypeSig          lhs.declsDeps = []
+  | FunBind          loc.ty = case M.lookup @matches.name @lhs.types of
+                                Nothing -> error "this should not happen"
+                                (Just t) -> t
+                     loc.gallinaDecl = mkFunDefDecl @matches.name 
+                                                    @matches.arity
+                                                    @ty
+                                                    @matches.gallinaMatches
+                     lhs.declsDeps = return ( @gallinaDecl 
+                                            , @matches.name
+                                            , @matches.dependencies ++ typeDeps @ty
+                                            )
+  | PatBind          loc.ty = case M.lookup @pat.var @lhs.types of
+                                Nothing -> error "this should not happen"
+                                (Just t) -> t
+                     loc.gallinaDecl = mkPatBindDefDecl @pat.var @ty @rhs.term
+                     lhs.declsDeps = return ( @gallinaDecl 
+                                            , @pat.var
+                                            , @rhs.dependencies ++ typeDeps @ty
+                                            )
+  | ForImp           lhs.declsDeps = []
+  | ForExp           lhs.declsDeps = []
+  | RulePragmaDecl   lhs.declsDeps = []
+  | DeprPragmaDecl   lhs.declsDeps = []
+  | WarnPragmaDecl   lhs.declsDeps = []
+  | InlineSig        lhs.declsDeps = []
+  | InlineConlikeSig lhs.declsDeps = []
+  | SpecSig          lhs.declsDeps = []
+  | SpecInlineSig    lhs.declsDeps = []
+  | InstSig          lhs.declsDeps = []
+  | AnnPragma        lhs.declsDeps = []
 
 sem Decl
   | TypeDecl         lhs.typeDecls = []
