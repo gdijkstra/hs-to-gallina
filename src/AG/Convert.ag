@@ -1,6 +1,5 @@
 imports
 {
-import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
 import Language.Haskell.Exts.Pretty
@@ -30,8 +29,10 @@ sndTrd3 :: (a, b, c) -> (b, c)
 sndTrd3 (_, b, c) = (b, c)
 
 declName :: GallinaDecl -> String
-declName (GallinaInductiveDecl d) = inductiveName d
-declName (GallinaDefinitionDecl d) = defName d
+declName (GallinaInductiveDecl (GallinaInductive ds)) = inductiveName . head $ ds
+declName (GallinaDefinitionDecl (GallinaFunction _ n _ _)) = n
+declName (GallinaDefinitionDecl (GallinaPatBinding n _ _)) = n
+declName _ = error "declName: meh"
 
 ppSCC :: SCC GallinaDecl -> String
 ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
@@ -46,19 +47,22 @@ typeDeps (GallinaTyCon v) = [v]
 
 toDefinition :: SCC GallinaDecl -> GallinaDefinition
 toDefinition (AcyclicSCC v) = toDef v
-toDefinition (CyclicSCC [GallinaInductiveDecl def]) = def
-toDefinition (CyclicSCC [GallinaDefinitionDecl (GallinaDefinition n t b)]) = GallinaFixpoint n t b
-toDefinition (CyclicSCC _) = error "Mutual recursion not supported"
-
+toDefinition (CyclicSCC is@((GallinaInductiveDecl _):_)) = GallinaInductive (concatMap toInd is)
+  where toInd (GallinaInductiveDecl (GallinaInductive s)) = s
+        toInd _ = error "toInd: meh"
+toDefinition (CyclicSCC is@((GallinaDefinitionDecl _):_)) = GallinaFixpoint (map toFix is)
+  where toFix (GallinaDefinitionDecl x@(GallinaFunction _ _ _ _)) = x
+        toFix (GallinaDefinitionDecl x@(GallinaPatBinding _ _ _)) = x
+        toFix _ = error "toFix: meh"
+toDefinition _ = error "toDefinition: meh"
 }
 
 attr Module
   syn vernacular :: Vernacular
                  
 sem Module                 
-  | Module lhs.vernacular = let gallinaDecls = map fst3 @decls.declsDeps
-                                scc = stronglyConnComp @decls.declsDeps
-                                defs = map toDefinition scc
+  | Module lhs.vernacular = let sccs = stronglyConnComp @decls.declsDeps
+                                defs = map toDefinition sccs
                             in trace (show . map ppSCC . stronglyConnComp $ @decls.declsDeps)
                                $
                                Vernacular { moduleName = @modulename.name
@@ -113,21 +117,21 @@ ppParams xs@(_:_) = ' ' : unwords xs
 
 mkFunDefDecl :: String -> Int -> GallinaType -> [GallinaMatch] -> GallinaDecl
 mkFunDefDecl name arity t ms = GallinaDefinitionDecl $ 
-                               GallinaDefinition name t (GallinaCase (mkTerms arity) ms)
-  where mkTerms arity = map (\n -> GallinaVar ('x' : show n)) [0 .. (arity - 1)]
+                               GallinaFunction arity name t (GallinaCase mkTerms ms)
+  where mkTerms = map (\n -> GallinaVar ('x' : show n)) [0 .. (arity - 1)]
 
 mkPatBindDefDecl :: String -> GallinaType -> GallinaTerm -> GallinaDecl     
 mkPatBindDefDecl name t body = GallinaDefinitionDecl $
-                               GallinaDefinition name t body
+                               GallinaPatBinding name t body
 }
 
 sem Decl                     
   | TypeDecl         lhs.declsDeps = []
   | TypeFamDecl      lhs.declsDeps = []
-  | DataDecl         loc.gallinaDecl = GallinaInductiveDecl $ 
-                                       GallinaInductive @name.name 
-                                                        @tyvarbinds.params
-                                                        @qualcondecls.constrs 
+  | DataDecl         loc.gallinaDecl = GallinaInductiveDecl . GallinaInductive . return $ 
+                                       GallinaInductiveBody @name.name 
+                                                            @tyvarbinds.params
+                                                            @qualcondecls.constrs 
                      lhs.declsDeps = return ( @gallinaDecl 
                                             , @name.name 
                                             , @qualcondecls.dependencies

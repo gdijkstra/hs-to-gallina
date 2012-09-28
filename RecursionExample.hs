@@ -25,3 +25,15 @@ not F = id T
 
 id :: a -> a
 id a = a
+
+data Zig = ZigC Zag
+
+data Zag = ZagC Zig
+
+test :: Nat -> B -> B
+test Zero = id
+test (Succ k) = not
+
+idBool :: B -> B
+idBool = id
+

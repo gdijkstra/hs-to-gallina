@@ -11,3 +11,4 @@ k a _ = a
 -- infer the implicit parameter b of k.
 i :: a -> a
 i = s k k
+

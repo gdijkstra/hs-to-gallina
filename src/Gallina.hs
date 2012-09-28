@@ -11,17 +11,26 @@ data GallinaConstructor = GallinaConstructor { constrName :: String
                                              , constrType :: GallinaType
                                              }
 
-data GallinaDefinition = GallinaInductive { inductiveName :: String
-                                         , inductiveParams :: [String]
-                                         , inductiveConstrs :: [GallinaConstructor] }
-                       | GallinaDefinition { defName :: String
-                                           , defType :: GallinaType
-                                           , defBody :: GallinaTerm
-                                           }
-                       | GallinaFixpoint { fixName :: String
-                                         , fixType :: GallinaType
-                                         , fixBody :: GallinaTerm
-                                         } 
+data GallinaDefinition = GallinaInductive [GallinaInductiveBody]
+                       | GallinaFunction { funArity :: Int
+                                         , funName :: String
+                                         , funType :: GallinaType
+                                         , funBody :: GallinaTerm
+                                         }
+                       | GallinaPatBinding { patName :: String
+                                           , patType :: GallinaType
+                                           , patBody :: GallinaTerm
+                                           } 
+                       | GallinaFixpoint [GallinaDefinition] 
+
+data GallinaInductiveBody = GallinaInductiveBody { inductiveName :: String
+                                                 , inductiveParams :: [String]
+                                                 , inductiveConstrs :: [GallinaConstructor] }
+
+data GallinaFixpointBody = GallinaFixpointBody { fixName :: String
+                                               , fixType :: GallinaType
+                                               , fixBody :: GallinaTerm
+                                               } 
 
 data GallinaMatch = GallinaMatch { matchPats :: [GallinaPat] 
                                  , matchTerm :: GallinaTerm
@@ -74,37 +83,16 @@ instance Pp GallinaConstructor where
   pp a = text (constrName a) <+> text ":" <+> pp (constrType a)
 
 instance Pp GallinaDefinition where
-  pp a@(GallinaInductive _ _ _) = text "Inductive" <+> text (inductiveName a) <+> params <+> text ": Set :="
-          $+$ nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a))
-                      <> text ".")
-    where params = if (not (null pars))
-                   then lparen <+> hsep (map text pars) <+> text ": Set" <+> rparen
+  pp (GallinaInductive is) = text "Inductive" <+> vsep (intersperse (text "with") . map ppBody $ is) <> text "."
+    where params a = if (not (null (pars a)))
+                   then lparen <+> hsep (map text (pars a)) <+> text ": Set" <+> rparen
                    else empty
-          pars = inductiveParams a
-  pp (GallinaDefinition n t b)= text "Definition" <+> text n
-         <+> ppFreeVars <+> ppArgs <+> text ":" <+> ppRes <+> text ":="
-         $$ nest 2 (pp b <> text ".")
-    where ppFreeVars = if not (null freeVars)
-                       then text "{" <+> hsep (map text freeVars)
-                            <+> text ": Set" <+> text "}" 
-                       else empty
-          ppArgs = hsep
-                   $ map (\(arg, no) -> parens (text ('x' : show no) 
-                                              <+> text ":" 
-                                              <+> pp arg))
-                   $ zip args ([0..] :: [Int])
-          ppRes = pp res
-          freeVars = case t of
-            (GallinaTyForall vars _) -> vars
-            _ -> []
-          flat (GallinaTyForall _ ty) = flat ty
-          flat (GallinaTyFun l r) = l : flat r
-          flat ty@(GallinaTyApp _ _) = [ty]
-          flat ty@(GallinaTyVar _) = [ty]
-          flat ty@(GallinaTyCon _) = [ty]
-          (args, res) = (init (flat t), last (flat t))
+          pars a = inductiveParams a
+          ppBody a = text (inductiveName a) <+> params a <+> text ": Set :="
+                     $+$ nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a)))
 
-  pp (GallinaFixpoint n t b)= text "Fixpoint" <+> text n
+
+  pp (GallinaFunction a n t b)= text "Definition" <+> text n
          <+> ppFreeVars <+> ppArgs <+> text ":" <+> ppRes <+> text ":="
          $$ nest 2 (pp b <> text ".")
     where ppFreeVars = if not (null freeVars)
@@ -125,7 +113,50 @@ instance Pp GallinaDefinition where
           flat ty@(GallinaTyApp _ _) = [ty]
           flat ty@(GallinaTyVar _) = [ty]
           flat ty@(GallinaTyCon _) = [ty]
-          (args, res) = (init (flat t), last (flat t))
+          unflat [] = error "unflat: empty list"
+          unflat [x] = x
+          unflat (x:xs) = GallinaTyFun x (unflat xs)
+          (args, res) = (take a (flat t), unflat $ drop a (flat t))
+  pp (GallinaPatBinding n t b)= text "Definition" <+> text n <+> ppFreeVars <+> text ":" 
+                                <+> pp t <+> text ":="
+                                $$ nest 2 (pp b <> text ".")
+    where ppFreeVars = if not (null freeVars)
+                       then text "{" <+> hsep (map text freeVars)
+                            <+> text ": Set" <+> text "}" 
+                       else empty
+          freeVars = case t of
+            (GallinaTyForall vars _) -> vars
+            _ -> []
+
+
+  pp (GallinaFixpoint is)= text "Fixpoint" <+> vsep (intersperse (text "with") . map ppBody $ is) <> text "."
+    where ppBody (GallinaFunction a n t b) = text n <+> ppFreeVars <+> ppArgs <+> text ":" <+> ppRes <+> text ":="
+                                           $$ nest 2 (pp b)
+            where ppFreeVars = if not (null freeVars)
+                               then text "{" <+> hsep (map text freeVars)
+                                    <+> text ": Set" <+> text "}" 
+                               else empty
+                  ppArgs = hsep
+                           $ map (\(arg, no) -> parens (text ('x' : show no) 
+                                                        <+> text ":" 
+                                                        <+> pp arg))
+                           $ zip args ([0..] :: [Int])
+                  ppRes = pp res
+                  freeVars = case t of
+                    (GallinaTyForall vars _) -> vars
+                    _ -> []
+                  flat (GallinaTyForall _ ty) = flat ty
+                  flat (GallinaTyFun l r) = l : flat r
+                  flat ty@(GallinaTyApp _ _) = [ty]
+                  flat ty@(GallinaTyVar _) = [ty]
+                  flat ty@(GallinaTyCon _) = [ty]
+                  unflat [] = error "unflat: empty list"
+                  unflat [x] = x
+                  unflat (x:xs) = GallinaTyFun x (unflat xs)
+                  (args, res) = (take a (flat t), unflat $ drop a (flat t))
+          ppBody (GallinaPatBinding n t b) = text n <+> text ":" <+> pp t <+> text ":="
+                                             $$ nest 2 (pp b)
+          ppBody _ = error "pp GallinaFixpoint: meh"
 
 instance Pp GallinaMatch where
   pp a = text "|" <+> commas (map pp (matchPats a)) 
@@ -171,9 +202,4 @@ patVars :: GallinaPat -> [String]
 patVars (GallinaPVar s) = [s]
 patVars (GallinaPApp s ps) = s : concatMap patVars ps
 patVars GallinaPWildCard = []
-
--- TODO: remove this, someday.
-testDefinition :: GallinaDefinition
-testDefinition = GallinaDefinition "const" (GallinaTyForall ["a", "b"] (GallinaTyFun (GallinaTyVar "a") (GallinaTyFun (GallinaTyVar "b") (GallinaTyVar "a")))) body
-  where body = GallinaCase [GallinaVar "x"] [GallinaMatch [GallinaPVar "a", GallinaPVar "b"] (GallinaVar "a")]
 
