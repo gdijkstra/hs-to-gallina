@@ -4,29 +4,24 @@ import Data.List
 import Text.PrettyPrint.HughesPJ
 
 data Vernacular = Vernacular { moduleName :: String 
-                             , moduleDataTypes :: [GallinaInductive]
                              , moduleDefinitions :: [GallinaDefinition]
                              }
-
-data GallinaInductive = GallinaInductive { inductiveName :: String
-                                         , inductiveParams :: [String]
-                                         , inductiveConstrs :: [GallinaConstructor] }
-
 
 data GallinaConstructor = GallinaConstructor { constrName :: String
                                              , constrType :: GallinaType
                                              }
 
-data GallinaDefinition = GallinaDefinition { defName :: String
+data GallinaDefinition = GallinaInductive { inductiveName :: String
+                                         , inductiveParams :: [String]
+                                         , inductiveConstrs :: [GallinaConstructor] }
+                       | GallinaDefinition { defName :: String
                                            , defType :: GallinaType
-                                           , defBody :: GallinaBody
+                                           , defBody :: GallinaTerm
                                            }
-
-data GallinaBody = GallinaFunBody { funArity :: Int
-                                  , funMatches :: [GallinaMatch]
-                                  }
-                 | GallinaPatBody GallinaTerm
-
+                       | GallinaFixpoint { fixName :: String
+                                         , fixType :: GallinaType
+                                         , fixBody :: GallinaTerm
+                                         } 
 
 data GallinaMatch = GallinaMatch { matchPats :: [GallinaPat] 
                                  , matchTerm :: GallinaTerm
@@ -46,7 +41,7 @@ data GallinaType
 data GallinaTerm = GallinaVar String
                  | GallinaApp GallinaTerm GallinaTerm
                  | GallinaLam [String] GallinaTerm
-                 | GallinaCase GallinaTerm [GallinaMatch]
+                 | GallinaCase [GallinaTerm] [GallinaMatch]
 
 -- Pretty printing
 
@@ -71,42 +66,66 @@ ppVernacular = render . pp
 
 instance Pp Vernacular where
   pp a = vsep [text "Module" <+> text (moduleName a) <> text "."
-              , vsep (map pp (moduleDataTypes a))
               , vsep (map pp (moduleDefinitions a))
               , text "End" <+> text (moduleName a) <> text "."
               ]
 
-instance Pp GallinaInductive where
-  pp a = text "Inductive" <+> text (inductiveName a) <+> params <+> text ": Set :="
+instance Pp GallinaConstructor where
+  pp a = text (constrName a) <+> text ":" <+> pp (constrType a)
+
+instance Pp GallinaDefinition where
+  pp a@(GallinaInductive _ _ _) = text "Inductive" <+> text (inductiveName a) <+> params <+> text ": Set :="
           $+$ nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a))
                       <> text ".")
     where params = if (not (null pars))
                    then lparen <+> hsep (map text pars) <+> text ": Set" <+> rparen
                    else empty
           pars = inductiveParams a
+  pp (GallinaDefinition n t b)= text "Definition" <+> text n
+         <+> ppFreeVars <+> ppArgs <+> text ":" <+> ppRes <+> text ":="
+         $$ nest 2 (pp b <> text ".")
+    where ppFreeVars = if not (null freeVars)
+                       then text "{" <+> hsep (map text freeVars)
+                            <+> text ": Set" <+> text "}" 
+                       else empty
+          ppArgs = hsep
+                   $ map (\(arg, no) -> parens (text ('x' : show no) 
+                                              <+> text ":" 
+                                              <+> pp arg))
+                   $ zip args ([0..] :: [Int])
+          ppRes = pp res
+          freeVars = case t of
+            (GallinaTyForall vars _) -> vars
+            _ -> []
+          flat (GallinaTyForall _ ty) = flat ty
+          flat (GallinaTyFun l r) = l : flat r
+          flat ty@(GallinaTyApp _ _) = [ty]
+          flat ty@(GallinaTyVar _) = [ty]
+          flat ty@(GallinaTyCon _) = [ty]
+          (args, res) = (init (flat t), last (flat t))
 
-instance Pp GallinaConstructor where
-  pp a = text (constrName a) <+> text ":" <+> pp (constrType a)
-
-instance Pp GallinaDefinition where
-  pp a = text "Definition" <+> text (defName a) 
-         <+> ppDefType (defType a) <+> text ":="
-         $$ nest 2 (pp (defBody a) <> text ".")
-    where ppDefType (GallinaTyForall vars ty) = (if not (null vars)
-                                                     then text "{" <+> hsep (map text vars)
-                                                          <+> text ": Set" <+> text "}" 
-                                                     else empty) <+> text ":" <+> pp ty
-          ppDefType ty = text ":" <+> pp ty
-
-instance Pp GallinaBody where
-  pp (GallinaFunBody arity ms) = text "fun" 
-                                 <+> hsep args
-                                 <+> text "=>" 
-                                 $$ nest 2 (text "match" <+> commas args <+> text "with" 
-                                            $+$ nest 2 (vcat (map pp ms))
-                                            $+$ text "end")
-    where args = (map (\n -> text "x" <> text (show n)) [0 .. (arity - 1)])
-  pp (GallinaPatBody t) = pp t
+  pp (GallinaFixpoint n t b)= text "Fixpoint" <+> text n
+         <+> ppFreeVars <+> ppArgs <+> text ":" <+> ppRes <+> text ":="
+         $$ nest 2 (pp b <> text ".")
+    where ppFreeVars = if not (null freeVars)
+                       then text "{" <+> hsep (map text freeVars)
+                            <+> text ": Set" <+> text "}" 
+                       else empty
+          ppArgs = hsep
+                   $ map (\(arg, no) -> parens (text ('x' : show no) 
+                                              <+> text ":" 
+                                              <+> pp arg))
+                   $ zip args ([0..] :: [Int])
+          ppRes = pp res
+          freeVars = case t of
+            (GallinaTyForall vars _) -> vars
+            _ -> []
+          flat (GallinaTyForall _ ty) = flat ty
+          flat (GallinaTyFun l r) = l : flat r
+          flat ty@(GallinaTyApp _ _) = [ty]
+          flat ty@(GallinaTyVar _) = [ty]
+          flat ty@(GallinaTyCon _) = [ty]
+          (args, res) = (init (flat t), last (flat t))
 
 instance Pp GallinaMatch where
   pp a = text "|" <+> commas (map pp (matchPats a)) 
@@ -132,7 +151,7 @@ instance Pp GallinaTerm where
                               <+> hsep (map text v)
                               <+> text "=>"
                               <+> nest 2 (pp e)
-  ppPrec _ (GallinaCase e ms) = text "match" <+> pp e <+> text "with" 
+  ppPrec _ (GallinaCase e ms) = text "match" <+> commas (map pp e) <+> text "with" 
                                 $+$ nest 2 (vcat (map pp ms))
                                 $+$ text "end"
 
@@ -156,5 +175,5 @@ patVars GallinaPWildCard = []
 -- TODO: remove this, someday.
 testDefinition :: GallinaDefinition
 testDefinition = GallinaDefinition "const" (GallinaTyForall ["a", "b"] (GallinaTyFun (GallinaTyVar "a") (GallinaTyFun (GallinaTyVar "b") (GallinaTyVar "a")))) body
-  where body = GallinaFunBody 2 [GallinaMatch [GallinaPVar "a", GallinaPVar "b"] (GallinaVar "a")]
+  where body = GallinaCase [GallinaVar "x"] [GallinaMatch [GallinaPVar "a", GallinaPVar "b"] (GallinaVar "a")]
 
