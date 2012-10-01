@@ -5,6 +5,7 @@
 *.vo
 *.glob
 *.o
+*.hi
 *.hcr
 dist/
 src/AG.hs
