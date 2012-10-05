@@ -1,0 +1,52 @@
+-- Utility functions and attributes.
+
+{
+difference :: Eq a => [a] -> [a] -> [a]
+difference b a = filter (`notElem` b) a
+}
+
+
+-- Name stuff
+
+attr Names
+  syn names :: {[String]}
+
+sem Names
+  | Nil lhs.names = []
+  | Cons lhs.names = @hd.name : @tl.names
+
+attr ModuleName Name QName TyVarBind Matches Match
+  syn name :: String
+              
+sem ModuleName
+  | ModuleName
+     lhs.name = @string
+
+sem Name
+  | Ident Symbol
+     lhs.name = @string
+
+sem QName
+  | Qual
+     lhs.name = @modulename.name ++ "." ++ @name.name
+  | UnQual
+     lhs.name = @name.name
+  | Special
+     lhs.name = error "name: Unsupported construct."
+                          
+sem TyVarBind
+  | KindedVar
+     lhs.name = error "name: Unsupported construct."
+  | UnkindedVar
+     lhs.name = @name.name
+
+sem Matches
+  | Nil
+     lhs.name = error "name: Matches list should never be empty"
+  | Cons
+     lhs.name = @hd.name
+
+sem Match                    
+  | Match
+     lhs.name = @name.name
+

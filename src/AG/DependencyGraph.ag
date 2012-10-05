@@ -1,0 +1,117 @@
+{
+typeDeps :: GallinaType -> [String]
+typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
+typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyVar v         ) = [v]
+typeDeps (GallinaTyCon v         ) = [v]
+}
+
+sem Decl                     
+  | DataDecl 
+     loc.dependencies = @qualcondecls.dependencies
+  | FunBind
+     loc.dependencies = @matches.dependencies ++ typeDeps @ty
+  | PatBind
+     loc.dependencies = @rhs.dependencies ++ typeDeps @ty
+
+attr Match Matches Rhs Exp QualConDecl QualConDecls ConDecl BangType
+  BangTypes Type Alt Alts GuardedAlts
+  syn dependencies :: {[String]}
+
+sem Matches
+  | Nil
+     lhs.dependencies = []
+  | Cons
+     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+
+sem Match                    
+  | Match
+     lhs.dependencies = (concatMap patVars @pats.gallinaPats) `difference` @rhs.dependencies
+
+sem Rhs
+  | UnGuardedRhs
+     lhs.dependencies = @exp.dependencies
+  | GuardedRhss
+     lhs.dependencies = error "dependencies: Unsupported construct rhs"
+
+sem Exp              
+  | Var Con
+     lhs.dependencies = [@qname.name]
+  | Lit
+     lhs.dependencies = [prettyPrint @literal]
+
+  | App
+     lhs.dependencies = @exp.dependencies ++ @exp1.dependencies
+  | Lambda
+     lhs.dependencies = @pats.vars `difference` @exp.dependencies
+  | Case
+     lhs.dependencies = @exp.dependencies ++ @alts.dependencies
+  | Paren
+     lhs.dependencies = @exp.dependencies
+
+  | NegApp InfixApp IPVar Let If Do MDo Tuple TupleSection List BracketExp
+    LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
+    EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
+    TypQuote SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
+    XChildTag CorePragma SCCPragma GenPragma Proc LeftArrApp RightArrApp
+    LeftArrHighApp RightArrHighApp
+     lhs.dependencies = error "dependencies: Unsupported construct exp"
+
+sem QualConDecls
+  | Nil
+     lhs.dependencies = []              
+  | Cons
+     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+    
+sem QualConDecl
+  | QualConDecl
+     lhs.dependencies = @condecl.dependencies
+             
+sem ConDecl             
+  | ConDecl
+     lhs.dependencies = @bangtypes.dependencies
+  | InfixConDecl RecDecl
+     lhs.dependencies = error "dependencies: Unsupported construct condecl"
+
+sem BangTypes
+  | Nil
+     lhs.dependencies = []
+  | Cons
+     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+                  
+sem BangType
+  | UnBangedTy
+     lhs.dependencies = @ty.dependencies
+  | BangedTy UnpackedTy
+     lhs.dependencies = error "dependencies: Unsupported construct bangtype"
+
+sem Type
+  | TyFun
+     lhs.dependencies = @ty.dependencies `difference` @ty1.dependencies
+  | TyApp
+     lhs.dependencies = @ty.dependencies ++ @ty1.dependencies
+  | TyVar
+     lhs.dependencies = [@name.name]
+  | TyCon
+     lhs.dependencies = [@qname.name]
+  | TyParen
+     lhs.dependencies = @ty.dependencies
+  | TyForall TyTuple TyList TyInfix TyKind
+     lhs.dependencies = error "dependencies: Unsupported construct type"
+
+sem Alts
+  | Nil
+     lhs.dependencies = []              
+  | Cons
+     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
+
+sem Alt
+  | Alt
+     lhs.dependencies = patVars @pat.gallinaPat `difference` @guardedalts.dependencies
+ 
+sem GuardedAlts              
+  | UnGuardedAlt 
+     lhs.dependencies = @exp.dependencies           
+  | GuardedAlts
+     lhs.dependencies = error "dependencies: Unsupported construct guardedalts"

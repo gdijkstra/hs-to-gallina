@@ -15,7 +15,9 @@ foldr f e (Cons x xs) = f x (foldr f e xs)
 
 data List a = Nil
              | Cons a (List a)
-              
+
+exampleList :: List B
+exampleList = Cons T Nil
 
 data B = T | F
 
@@ -26,14 +28,30 @@ not F = id T
 id :: a -> a
 id a = a
 
-data Zig = ZigC Zag
-
-data Zag = ZagC Zig
-
 test :: Nat -> B -> B
-test Zero = id
+test Zero = idBool
 test (Succ k) = not
 
 idBool :: B -> B
 idBool = id
+
+-- Simple mutually recursive data types.
+data Zig = ZigC Zag
+
+data Zag = ZagC Zig
+
+-- Perfect binary trees
+data Pair a = P a a
+
+data Perfect a = Z a
+               | S (Perfect (Pair a))
+
+perfect :: Perfect B
+perfect = S (Z (P T T))
+
+-- Rose trees
+data Rose a = R a (List (Rose a))
+
+rose :: Rose B
+rose = R T (Cons (R T Nil) (Cons (R F Nil) Nil))
 

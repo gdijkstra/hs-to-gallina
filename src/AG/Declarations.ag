@@ -1,0 +1,50 @@
+attr Decls
+  syn declsDeps :: {[(GallinaUngroupedDefinition, String, [String])]}
+
+sem Decls
+  | Nil  lhs.declsDeps = []
+  | Cons lhs.declsDeps = @hd.declsDeps ++ @tl.declsDeps
+
+attr Decl                          
+  syn declsDeps :: {[(GallinaUngroupedDefinition, String, [String])]}
+
+{
+mkFunDefDecl :: String -> Int -> GallinaType -> [GallinaMatch] -> GallinaUngroupedDefinition
+mkFunDefDecl name arity t ms = GallinaUngroupedFunOrPat . Left $ 
+                               GallinaFunctionBody arity name t (GallinaCase mkTerms ms)
+  where mkTerms = map (\n -> GallinaVar ('x' : show n)) [0 .. (arity - 1)]
+
+mkPatBindDefDecl :: String -> GallinaType -> GallinaTerm -> GallinaUngroupedDefinition     
+mkPatBindDefDecl name t body = GallinaUngroupedFunOrPat . Right $
+                               GallinaPatBindingBody name t body
+}
+
+sem Decl                     
+  | DataDecl 
+     lhs.declsDeps = return ( GallinaUngroupedInd $
+                              GallinaInductiveBody @indName @params @constrs 
+                            , @indName 
+                            , @dependencies
+                            )
+  | FunBind
+     loc.gallinaDecl = mkFunDefDecl @matches.name 
+                                    @matches.arity
+                                    @ty
+                                    @matches.gallinaMatches
+     lhs.declsDeps = return ( @gallinaDecl 
+                            , @matches.name
+                            , @dependencies
+                                    )
+  | PatBind
+     loc.gallinaDecl = mkPatBindDefDecl @pat.var @ty @rhs.term
+     lhs.declsDeps = return ( @gallinaDecl 
+                            , @pat.var
+                            , @dependencies
+                                    )
+-- The following constructors are ignored.
+ | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+   GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
+   SpliceDecl TypeSig ForImp ForExp RulePragmaDecl DeprPragmaDecl 
+   WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 
+   InstSig AnnPragma 
+     lhs.declsDeps = []

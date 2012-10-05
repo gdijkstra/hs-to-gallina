@@ -1,18 +1,28 @@
 imports
 {
-import Language.Haskell.Exts.Syntax
-import Gallina
+import           Data.Graph
+import           Data.List
+import           Debug.Trace
+import           Gallina.Syntax
+import           Language.Haskell.Exts.Pretty
+import           Language.Haskell.Exts.Syntax
+import           Data.Map (Map)
+import qualified Data.Map as M
+
 }
 
 module {AG} {} {}
 
-include "AG/Types.ag"
+include "AG/TypeSynonyms.ag"
 include "AG/Syntax.ag"
-include "AG/Convert.ag"
-
+include "AG/Vernacular.ag"
+include "AG/Declarations.ag"
+include "AG/DataTypes.ag"
+include "AG/Terms.ag"
+include "AG/Types.ag"
+include "AG/DependencyGraph.ag"
+include "AG/Util.ag"
 {
-
 convertToGallina :: Module -> Vernacular
 convertToGallina m = vernacular_Syn_Module $ wrap_Module (sem_Module m) $ Inh_Module
-  
 }

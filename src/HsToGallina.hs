@@ -1,14 +1,14 @@
-import AG
-import Gallina
-import Language.Haskell.Exts
-import System.Environment (getArgs)
-import System.FilePath
-import Data.Foldable
+import           AG
+import           Data.Foldable
+import           Gallina.PrettyPrinting
+import           Language.Haskell.Exts
+import           System.Environment     (getArgs)
+import           System.FilePath
 
-data Args = Args 
-            { filePath :: FilePath
-            , writePath :: Maybe FilePath
-            }
+data Args =
+  Args { filePath  :: FilePath
+       , writePath :: Maybe FilePath
+       }
 
 parseArgs :: [String] -> Maybe Args
 parseArgs [fp] = Just $ Args { filePath = fp, writePath = Nothing }
@@ -19,7 +19,10 @@ parseArgs ["-w", outfp, fp] = Just $ Args { filePath = fp, writePath = Just outf
 parseArgs _ = Nothing
 
 helpMessage :: IO ()
-helpMessage = putStrLn "HsToGallina [-w [OUTFILE]] FILE\n\n  -w: write the output to a file. If OUTFILE is not given, then it will write to FILE with the extension replaced by \".v\""
+helpMessage = do
+  putStrLn "HsToGallina [-w [OUTFILE]] FILE"
+  putStrLn "  -w: write the output to a file. If OUTFILE is not given, then"
+  putStrLn "      it will write to FILE with the extension replaced by \".v\""
 
 convertFile :: Args -> IO ()
 convertFile args = do

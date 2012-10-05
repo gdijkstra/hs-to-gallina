@@ -1,13 +1,13 @@
 CABAL-CONFIGURE-FLAGS := --user
 CABAL-BUILD-FLAGS     :=
-TESTFILE=examples/SKI.hs
+TESTFILE=examples/RecursionExample.hs
 TESTFILEBN=$(basename $(TESTFILE))
 
 default : test
 
 all : haskell
 
-src/AG.hs : src/AG.ag src/AG/Types.ag src/AG/Syntax.ag src/AG/Convert.ag
+src/AG.hs : src/AG.ag src/AG/*.ag
 	@echo "Make: running uuagc..."
 	uuagc -Hcfws --self --optimize -P src src/AG.ag
 

@@ -1,51 +1,121 @@
+-- Collection of type declarations.
+attr Decls Decl
+  syn typeDecls :: {[(String, GallinaType)]}
+  inh types :: {Map String GallinaType}
+
+sem Module                 
+  | Module decls.types = M.fromList @decls.typeDecls
+
+sem Decls
+  | Nil
+     lhs.typeDecls = []
+  | Cons
+     lhs.typeDecls = @hd.typeDecls ++ @tl.typeDecls
+     hd.types = @lhs.types
+
+sem Decl
+  | TypeSig
+     lhs.typeDecls = map (\n -> (n, (generalise @ty.gallinaType))) @names.names
+  | TypeDecl TypeFamDecl DataDecl GDataDecl DataFamDecl TypeInsDecl 
+    DataInsDecl GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl 
+    DefaultDecl SpliceDecl FunBind PatBind ForImp ForExp RulePragmaDecl 
+    DeprPragmaDecl WarnPragmaDecl InlineSig InlineConlikeSig SpecSig 
+    SpecInlineSig InstSig AnnPragma 
+     lhs.typeDecls = []
+
+-- Find the associated type of a definition.
+sem Decl                     
+  | FunBind
+     loc.location = "dunno"
+     loc.ty = case M.lookup @matches.name @lhs.types of
+                Nothing -> error $ "ty: could not find type of "
+                           ++ show @matches.name
+                           ++ " (at " ++ @location ++ ")"
+                (Just t) -> t
+  | PatBind
+     loc.location = prettyPrint @srcloc
+     loc.ty = case M.lookup @pat.var @lhs.types of
+                        Nothing -> error $ "ty: could not find type of "
+                                   ++ show @pat.var
+                                   ++ " (at " ++ @location ++ ")"
+                        (Just t) -> t
+
+attr Matches Match
+  syn location :: SrcLoc
+                  
+sem Matches
+  | Nil
+     lhs.location = error "location: matches list should never be empty"
+  | Cons
+     lhs.location = @hd.location
+
+sem Match
+  | Match
+     lhs.location = @srcloc
+
+-- Conversion of Haskell types to Gallina types.
+attr BangTypes QualConDecls QualConDecl ConDecl
+  inh dataName :: String -- Needed for types of constructors
+
 {
-type Alts = [Alt]
-type BangTypes = [BangType]
-type CNames = [CName]
-type ClassDecls = [ClassDecl]
-type Decls = [Decl]
-type Derivings = [Deriving]
-type ExpOpt = Maybe Exp
-type ExpOpts = [ExpOpt]
-type ExportSpecs = [ExportSpec]
-type ExportSpecsOpt = Maybe ExportSpecs
-type Exps = [Exp]
-type FieldUpdates = [FieldUpdate]
-type FunDeps = [FunDep]
-type GadtDecls = [GadtDecl]
-type GuardedAltList = [GuardedAlt]
-type GuardedRhss = [GuardedRhs]
-type IPBinds = [IPBind]
-type ImportDecls = [ImportDecl]
-type ImportSpecs = [ImportSpec]
-type ImportSpecsBool = (Bool, ImportSpecs)
-type ImportSpecsOpt = Maybe ImportSpecsBool -- TODO: curly braces would be better
-type InstDecls = [InstDecl]
-type KindOpt = Maybe Kind
-type Matches = [Match]
-type ModuleNameOpt = Maybe ModuleName
-type ModulePragmas = [ModulePragma]
-type Names = [Name]
-type Ops = [Op]
-type PXAttrs = [PXAttr]
-type PatFields = [PatField]
-type PatOpt = Maybe Pat
-type Pats = [Pat]
-type QualConDecls = [QualConDecl]
-type QualStmts = [QualStmt]
-type QualStmtss = [QualStmts]
-type RPats = [RPat]
-type RuleVars = [RuleVar]
-type RuleVarsOpt = Maybe RuleVars
-type Rules = [Rule]
-type Stmts = [Stmt]
-type StringOpt = Maybe String
-type ToolOpt = Maybe Tool
-type TyVarBinds = [TyVarBind]
-type TyVarBindsOpt = Maybe TyVarBinds
-type TypeOpt = Maybe Type
-type Types = [Type]
-type WarningTextOpt = Maybe WarningText
-type XAttrs = [XAttr]
-type GallinaDeclOpt = Maybe GallinaDecl
+ppParams :: [String] -> String
+ppParams [] = ""
+ppParams xs@(_:_) = ' ' : unwords xs
 }
+
+sem Decl
+  | DataDecl
+     qualcondecls.dataName = @name.name ++ ppParams @tyvarbinds.params
+
+attr BangTypes BangType Type
+  syn gallinaType :: GallinaType
+                     
+sem BangTypes
+  | Nil
+     lhs.gallinaType = GallinaTyCon @lhs.dataName
+  | Cons
+     lhs.gallinaType = GallinaTyFun @hd.gallinaType @tl.gallinaType
+                  
+sem BangType
+  | UnBangedTy
+     lhs.gallinaType = @ty.gallinaType
+  | BangedTy UnpackedTy
+     lhs.gallinaType = error "gallinaType: unsupported construct"
+
+sem Type
+  | TyFun
+     lhs.gallinaType = GallinaTyFun @ty.gallinaType @ty1.gallinaType
+  | TyApp
+     lhs.gallinaType = GallinaTyApp @ty.gallinaType @ty1.gallinaType
+  | TyVar
+     lhs.gallinaType = GallinaTyVar @name.name
+  | TyCon
+     lhs.gallinaType = GallinaTyCon @qname.name
+  | TyParen
+     lhs.gallinaType = @ty.gallinaType
+  | TyForall TyTuple TyList TyInfix TyKind
+     lhs.gallinaType = error "gallinaType: unsupported construct"
+
+-- Missing rules for inherited attributes
+sem Binds
+  | BDecls
+     decls.types = error "Don't do this"
+                         
+sem Bracket
+  | DeclBracket
+     decls.types = error "Don't do this"
+                              
+sem ClassDecl
+  | ClsDecl
+     decl.types = error "Don't do this"
+                         
+sem Decl
+  | DataInsDecl
+     qualcondecls.dataName = error "Don't do this"
+
+sem InstDecl
+  | InsData
+     qualcondecls.dataName = error "Don't do this"
+  | InsDecl
+     decl.types = error "Don't do this"
+                         

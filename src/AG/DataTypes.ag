@@ -1,0 +1,36 @@
+-- Conversion of data type definitions
+
+sem Decl
+  | DataDecl
+     loc.indName = @name.name
+     loc.params = @tyvarbinds.params
+     loc.constrs = @qualcondecls.constrs
+
+attr QualConDecls
+  syn constrs :: {[GallinaConstructor]}
+
+sem QualConDecls
+  | Nil
+     lhs.constrs = []
+  | Cons
+     lhs.constrs = @hd.constr : @tl.constrs
+
+attr QualConDecl ConDecl
+  syn constr :: GallinaConstructor
+           
+sem QualConDecl
+  | QualConDecl
+     lhs.constr = @condecl.constr
+             
+sem ConDecl             
+  | ConDecl
+     lhs.constr = GallinaConstructor @name.name @bangtypes.gallinaType
+  | InfixConDecl RecDecl
+     lhs.constr = error "constr: unsupported construct"
+
+attr TyVarBinds
+  syn params :: {[String]}
+            
+sem TyVarBinds
+  | Nil  lhs.params = []
+  | Cons lhs.params = @hd.name : @tl.params

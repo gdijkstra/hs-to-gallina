@@ -1,0 +1,45 @@
+-- Order and group all the definitions and make a Vernacular document
+-- out of it.
+
+{
+groupDefinitions :: SCC GallinaUngroupedDefinition -> GallinaDefinition
+groupDefinitions (AcyclicSCC x) = toDef x
+  where
+    toDef (GallinaUngroupedInd b              ) = GallinaInductive [b]
+    toDef (GallinaUngroupedFunOrPat (Left b)  ) = GallinaFunction b
+    toDef (GallinaUngroupedFunOrPat (Right b) ) = GallinaPatBinding b
+groupDefinitions (CyclicSCC is@((GallinaUngroupedInd _):_)) = GallinaInductive (map toInd is)
+  where
+    toInd (GallinaUngroupedInd b) = b
+    toInd _ = error "groupDefinitions: toInd: argument must be an inductive definition."
+groupDefinitions (CyclicSCC is@((GallinaUngroupedFunOrPat _):_)) = GallinaFixpoint (map toFix is)
+  where
+    toFix (GallinaUngroupedFunOrPat b) = b
+    toFix _ = error "groupDefinitions: toFix: argument must be a function or pattern binding."
+groupDefinitions (CyclicSCC []) = error "groupDefinitions: CyclicSCC should have non-empty list argument."
+
+declName :: GallinaUngroupedDefinition -> String
+declName (GallinaUngroupedInd b              ) = inductiveName b
+declName (GallinaUngroupedFunOrPat (Left b)  ) = funName b
+declName (GallinaUngroupedFunOrPat (Right b) ) = patName b
+
+ppSCC :: SCC GallinaUngroupedDefinition -> String
+ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
+ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
+
+mkVernacular :: String -> [(GallinaUngroupedDefinition, String, [String])] -> Vernacular
+mkVernacular name ungroupedDefs = let sccs = stronglyConnComp ungroupedDefs
+                                      groupedDefs = map groupDefinitions sccs
+                                  in trace (show . map ppSCC $ sccs)
+                                     $
+                                     Vernacular { moduleName = name
+                                                , moduleDefinitions = groupedDefs
+                                                }
+
+}
+
+attr Module
+  syn vernacular :: Vernacular
+                 
+sem Module                 
+  | Module lhs.vernacular = mkVernacular @modulename.name @decls.declsDeps
