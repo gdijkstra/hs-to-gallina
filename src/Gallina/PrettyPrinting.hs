@@ -64,12 +64,14 @@ instance Pp GallinaConstructor where
               , pp (constrType a)
               ]
 
+ppArg Nothing  no = text ('x' : show no)
+ppArg (Just t) no = parens . hsep $ [text ('x' : show no), text ":", pp t]
+
 instance Pp GallinaFunctionBody where
   pp (GallinaFunctionBody a n t b) = hsep [ text n
                                           , ppFreeVars
                                           , ppArgs
-                                          , text ":"
-                                          , ppRes
+                                          , maybe empty ((text ":" <+>) . pp) res
                                           , text ":="
                                           ]
                                      $$ nest 2 (pp b)
@@ -82,29 +84,29 @@ instance Pp GallinaFunctionBody where
                              ]
                    else empty
       ppArgs = hsep
-               $ map (\(arg, no) -> parens (text ('x' : show no)
-                                            <+> text ":"
-                                            <+> pp arg))
+               $ map (\(arg, no) -> ppArg arg no)
                $ zip args ([0..] :: [Int])
-      ppRes = pp res
       freeVars = case t of
-        (GallinaTyForall vars _) -> vars
+        (Just (GallinaTyForall vars _)) -> vars
         _ -> []
       flat (GallinaTyForall _ ty ) = flat ty
       flat (GallinaTyFun l r     ) = l : flat r
       flat ty@(GallinaTyApp _ _  ) = [ty]
       flat ty@(GallinaTyVar _    ) = [ty]
       flat ty@(GallinaTyCon _    ) = [ty]
-      unflat []     = error "unflat: empty list"
-      unflat [x]    = x
-      unflat (x:xs) = GallinaTyFun x (unflat xs)
-      (args, res) = (take a (flat t), unflat $ drop a (flat t))
+      unflat []     = Nothing
+      unflat [x]    = Just x
+      unflat (x:xs) = do
+        uxs <- unflat xs
+        return $ GallinaTyFun x uxs
+      (args, res) = case t of
+        Nothing -> (replicate a Nothing, Nothing)
+        Just x -> (map Just $ take a (flat x), unflat $ drop a (flat x))
 
 instance Pp GallinaPatBindingBody where
   pp (GallinaPatBindingBody n t b) = hsep [ text n
                                           , ppFreeVars
-                                          , text ":"
-                                          , pp t
+                                          , maybe empty ((text ":" <+>) . pp) t
                                           , text ":="
                                           ]
                                      $$ nest 2 (pp b)
@@ -117,7 +119,7 @@ instance Pp GallinaPatBindingBody where
                              ]
                    else empty
       freeVars = case t of
-        (GallinaTyForall vars _) -> vars
+        (Just (GallinaTyForall vars _)) -> vars
         _ -> []
 
 instance (Pp a, Pp b) => Pp (Either a b) where

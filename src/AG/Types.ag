@@ -1,17 +1,15 @@
 -- Collection of type declarations.
+sem Module                 
+  | Module loc.types = M.fromList @decls.typeDecls
+
 attr Decls Decl
   syn typeDecls :: {[(String, GallinaType)]}
-  inh types :: {Map String GallinaType}
-
-sem Module                 
-  | Module decls.types = M.fromList @decls.typeDecls
 
 sem Decls
   | Nil
      lhs.typeDecls = []
   | Cons
      lhs.typeDecls = @hd.typeDecls ++ @tl.typeDecls
-     hd.types = @lhs.types
 
 sem Decl
   | TypeSig
@@ -22,36 +20,6 @@ sem Decl
     DeprPragmaDecl WarnPragmaDecl InlineSig InlineConlikeSig SpecSig 
     SpecInlineSig InstSig AnnPragma 
      lhs.typeDecls = []
-
--- Find the associated type of a definition.
-sem Decl                     
-  | FunBind
-     loc.location = "dunno"
-     loc.ty = case M.lookup @matches.name @lhs.types of
-                Nothing -> error $ "ty: could not find type of "
-                           ++ show @matches.name
-                           ++ " (at " ++ @location ++ ")"
-                (Just t) -> t
-  | PatBind
-     loc.location = prettyPrint @srcloc
-     loc.ty = case M.lookup @pat.var @lhs.types of
-                        Nothing -> error $ "ty: could not find type of "
-                                   ++ show @pat.var
-                                   ++ " (at " ++ @location ++ ")"
-                        (Just t) -> t
-
-attr Matches Match
-  syn location :: SrcLoc
-                  
-sem Matches
-  | Nil
-     lhs.location = error "location: matches list should never be empty"
-  | Cons
-     lhs.location = @hd.location
-
-sem Match
-  | Match
-     lhs.location = @srcloc
 
 -- Conversion of Haskell types to Gallina types.
 attr BangTypes QualConDecls QualConDecl ConDecl
@@ -97,18 +65,6 @@ sem Type
      lhs.gallinaType = error "gallinaType: unsupported construct"
 
 -- Missing rules for inherited attributes
-sem Binds
-  | BDecls
-     decls.types = error "Don't do this"
-                         
-sem Bracket
-  | DeclBracket
-     decls.types = error "Don't do this"
-                              
-sem ClassDecl
-  | ClsDecl
-     decl.types = error "Don't do this"
-                         
 sem Decl
   | DataInsDecl
      qualcondecls.dataName = error "Don't do this"
@@ -116,6 +72,4 @@ sem Decl
 sem InstDecl
   | InsData
      qualcondecls.dataName = error "Don't do this"
-  | InsDecl
-     decl.types = error "Don't do this"
                          

@@ -2,6 +2,8 @@
 -- out of it.
 
 {
+type DeclDeps =  [(GallinaUngroupedDefinition, String, [String])]
+
 groupDefinitions :: SCC GallinaUngroupedDefinition -> GallinaDefinition
 groupDefinitions (AcyclicSCC x) = toDef x
   where
@@ -27,19 +29,76 @@ ppSCC :: SCC GallinaUngroupedDefinition -> String
 ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
 ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
 
-mkVernacular :: String -> [(GallinaUngroupedDefinition, String, [String])] -> Vernacular
-mkVernacular name ungroupedDefs = let sccs = stronglyConnComp ungroupedDefs
-                                      groupedDefs = map groupDefinitions sccs
-                                  in trace (show . map ppSCC $ sccs)
-                                     $
-                                     Vernacular { moduleName = name
-                                                , moduleDefinitions = groupedDefs
-                                                }
+typeDeps :: GallinaType -> [String]
+typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
+typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyVar v         ) = [v]
+typeDeps (GallinaTyCon v         ) = [v]
 
+associateTypes :: Map String GallinaType -> DeclDeps -> DeclDeps 
+associateTypes types declDeps = map f declDeps
+  where
+    f (def@(GallinaUngroupedInd _), name, deps) = (def, name, deps)
+    f ((GallinaUngroupedFunOrPat b), name, deps) = ( associateType name b
+                                                   , name
+                                                   , deps ++ typeDeps (ty name)
+                                                   )
+
+    associateType :: String -> FunOrPatBody -> GallinaUngroupedDefinition
+    associateType n (Left b ) = GallinaUngroupedFunOrPat
+                                $ Left
+                                $ b { funType = Just $ ty n }
+    associateType n (Right b) = GallinaUngroupedFunOrPat
+                                $ Right
+                                $ b { patType = Just $ ty n }
+
+    ty n = case M.lookup n types of
+      Nothing -> error $ "ty: could not find type of " ++ show n
+      (Just t) -> t
+
+associateConstrs :: Map String String -> DeclDeps -> DeclDeps
+associateConstrs constrMap declDeps = map (third associate) declDeps
+  where
+    third :: (c -> d) -> (a, b, c) -> (a, b, d)
+    third f = \(a, b, c) -> (a, b, f c)
+    associate names = map (\x -> M.findWithDefault x x constrMap) names
+
+mkVernacular :: Map String GallinaType -> Map String String -> String -> DeclDeps -> Vernacular
+mkVernacular types constrMap name ungroupedDefs =
+  let typedDefs = associateTypes types . associateConstrs constrMap $ ungroupedDefs
+      sccs = stronglyConnComp typedDefs
+      groupedDefs = map groupDefinitions sccs
+  in trace ((show . map ppSCC $ sccs))
+     $ Vernacular { moduleName = name
+                  , moduleDefinitions = groupedDefs
+                  }
 }
 
 attr Module
   syn vernacular :: Vernacular
                  
 sem Module                 
-  | Module lhs.vernacular = mkVernacular @modulename.name @decls.declsDeps
+  | Module lhs.vernacular = mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+           loc.constrMap = M.fromList @decls.constrAssocs
+
+-- Associate constructor names with the data type they belong to.
+attr Decl Decls
+  syn constrAssocs :: {[(String, String)]}
+
+sem Decls
+  | Nil
+     lhs.constrAssocs = []
+  | Cons
+     lhs.constrAssocs = @hd.constrAssocs ++ @tl.constrAssocs
+
+sem Decl
+  | DataDecl
+     lhs.constrAssocs = map (\x -> (constrName x, @indName)) @constrs
+  | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+    GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
+    SpliceDecl TypeSig ForImp ForExp RulePragmaDecl DeprPragmaDecl 
+    WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 
+    InstSig AnnPragma FunBind PatBind
+     lhs.constrAssocs = []
+

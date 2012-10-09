@@ -5,7 +5,7 @@ sem Decl
      loc.indName = @name.name
      loc.params = @tyvarbinds.params
      loc.constrs = @qualcondecls.constrs
-
+              
 attr QualConDecls
   syn constrs :: {[GallinaConstructor]}
 

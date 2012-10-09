@@ -7,53 +7,71 @@ data Vernacular =
   { moduleName        :: String
   , moduleDefinitions :: [GallinaDefinition]
   }
+  deriving Show
+
+type FunOrPatBody = Either GallinaFunctionBody GallinaPatBindingBody
 
 data GallinaUngroupedDefinition =
   GallinaUngroupedInd GallinaInductiveBody
-  | GallinaUngroupedFunOrPat (Either GallinaFunctionBody GallinaPatBindingBody)
+  | GallinaUngroupedFunOrPat FunOrPatBody
+  deriving Show
 
 data GallinaDefinition =
   GallinaInductive [GallinaInductiveBody]
   | GallinaFunction GallinaFunctionBody
   | GallinaPatBinding GallinaPatBindingBody
   | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody]
+  deriving Show
+
 
 data GallinaInductiveBody =
   GallinaInductiveBody { inductiveName    :: String
                        , inductiveParams  :: [String]
                        , inductiveConstrs :: [GallinaConstructor] }
+  deriving Show
+
 
 data GallinaConstructor =
   GallinaConstructor
   { constrName :: String
   , constrType :: GallinaType
   }
+  deriving Show
+
 
 data GallinaFunctionBody =
   GallinaFunctionBody
   { funArity :: Int
   , funName  :: String
-  , funType  :: GallinaType
+  , funType  :: Maybe GallinaType
   , funBody  :: GallinaTerm
   }
+  deriving Show
+
 
 data GallinaPatBindingBody =
   GallinaPatBindingBody
   { patName :: String
-  , patType :: GallinaType
+  , patType :: Maybe GallinaType
   , patBody :: GallinaTerm
   }
+  deriving Show
+
 
 data GallinaMatch =
   GallinaMatch
   { matchPats :: [GallinaPat]
   , matchTerm :: GallinaTerm
   }
+  deriving Show
+
 
 data GallinaPat =
   GallinaPVar String
   | GallinaPApp String [GallinaPat]
   | GallinaPWildCard
+  deriving Show
+
 
 data GallinaType =
   GallinaTyForall [String] GallinaType
@@ -61,12 +79,15 @@ data GallinaType =
   | GallinaTyApp GallinaType GallinaType
   | GallinaTyVar String
   | GallinaTyCon String
+  deriving Show
+
 
 data GallinaTerm =
   GallinaVar String
   | GallinaApp GallinaTerm GallinaTerm
   | GallinaLam [String] GallinaTerm
   | GallinaCase [GallinaTerm] [GallinaMatch]
+  deriving Show
 
 generalise :: GallinaType -> GallinaType
 generalise ty = let vars = ftv ty in if not (null vars)

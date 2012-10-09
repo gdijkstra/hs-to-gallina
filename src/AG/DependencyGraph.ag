@@ -1,19 +1,11 @@
-{
-typeDeps :: GallinaType -> [String]
-typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
-typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
-typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
-typeDeps (GallinaTyVar v         ) = [v]
-typeDeps (GallinaTyCon v         ) = [v]
-}
-
 sem Decl                     
   | DataDecl 
      loc.dependencies = @qualcondecls.dependencies
   | FunBind
-     loc.dependencies = @matches.dependencies ++ typeDeps @ty
+     loc.dependencies = @matches.dependencies
   | PatBind
-     loc.dependencies = @rhs.dependencies ++ typeDeps @ty
+     loc.dependencies = @rhs.dependencies
+
 
 attr Match Matches Rhs Exp QualConDecl QualConDecls ConDecl BangType
   BangTypes Type Alt Alts GuardedAlts
