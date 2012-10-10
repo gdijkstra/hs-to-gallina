@@ -23,6 +23,11 @@ data GallinaDefinition =
   | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody]
   deriving Show
 
+data GallinaLetDefinition =
+  GallinaLetFunction GallinaFunctionBody
+  | GallinaLetPatBinding GallinaPatBindingBody
+  | GallinaLetFixpoint (Either GallinaFunctionBody GallinaPatBindingBody)
+  deriving Show
 
 data GallinaInductiveBody =
   GallinaInductiveBody { inductiveName    :: String
@@ -87,6 +92,7 @@ data GallinaTerm =
   | GallinaApp GallinaTerm GallinaTerm
   | GallinaLam [String] GallinaTerm
   | GallinaCase [GallinaTerm] [GallinaMatch]
+  | GallinaLet [GallinaLetDefinition] GallinaTerm
   deriving Show
 
 generalise :: GallinaType -> GallinaType

@@ -54,4 +54,3 @@ data Rose a = R a (List (Rose a))
 
 rose :: Rose B
 rose = R T (Cons (R T Nil) (Cons (R F Nil) Nil))
-

@@ -19,26 +19,34 @@ mkPatBindDefDecl name t body = GallinaUngroupedFunOrPat . Right $
                                GallinaPatBindingBody name t body
 }
 
+sem Decl
+  | DataDecl
+     loc.declName = @indName
+  | FunBind
+     loc.declName = @matches.name
+  | PatBind
+     loc.declName = @pat.var
+
 sem Decl                     
   | DataDecl 
      lhs.declsDeps = return ( GallinaUngroupedInd $
-                              GallinaInductiveBody @indName @params @constrs 
-                            , @indName 
+                              GallinaInductiveBody @declName @params @constrs 
+                            , @declName
                             , @dependencies
                             )
   | FunBind
-     loc.gallinaDecl = mkFunDefDecl @matches.name 
+     loc.gallinaDecl = mkFunDefDecl @declName
                                     @matches.arity
                                     Nothing
                                     @matches.gallinaMatches
      lhs.declsDeps = return ( @gallinaDecl 
-                            , @matches.name
+                            , @declName
                             , @dependencies
                                     )
   | PatBind
-     loc.gallinaDecl = mkPatBindDefDecl @pat.var Nothing @rhs.term
+     loc.gallinaDecl = mkPatBindDefDecl @declName Nothing (attachBindings @rhs.term @binds.definitions)
      lhs.declsDeps = return ( @gallinaDecl 
-                            , @pat.var
+                            , @declName
                             , @dependencies
                                     )
 -- The following constructors are ignored.

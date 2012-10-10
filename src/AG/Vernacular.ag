@@ -33,7 +33,7 @@ typeDeps :: GallinaType -> [String]
 typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
 typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
-typeDeps (GallinaTyVar v         ) = [v]
+typeDeps (GallinaTyVar _         ) = []
 typeDeps (GallinaTyCon v         ) = [v]
 
 associateTypes :: Map String GallinaType -> DeclDeps -> DeclDeps 
@@ -58,18 +58,20 @@ associateTypes types declDeps = map f declDeps
       (Just t) -> t
 
 associateConstrs :: Map String String -> DeclDeps -> DeclDeps
-associateConstrs constrMap declDeps = map (third associate) declDeps
+associateConstrs constrMap declDeps = map (third (associate constrMap)) declDeps
   where
     third :: (c -> d) -> (a, b, c) -> (a, b, d)
     third f = \(a, b, c) -> (a, b, f c)
-    associate names = map (\x -> M.findWithDefault x x constrMap) names
+
+associate :: Map String String -> [String] -> [String]
+associate constrMap names = map (\x -> M.findWithDefault x x constrMap) names
 
 mkVernacular :: Map String GallinaType -> Map String String -> String -> DeclDeps -> Vernacular
 mkVernacular types constrMap name ungroupedDefs =
   let typedDefs = associateTypes types . associateConstrs constrMap $ ungroupedDefs
       sccs = stronglyConnComp typedDefs
       groupedDefs = map groupDefinitions sccs
-  in trace ((show . map ppSCC $ sccs))
+  in trace (show . map ppSCC $ sccs)
      $ Vernacular { moduleName = name
                   , moduleDefinitions = groupedDefs
                   }
@@ -79,8 +81,9 @@ attr Module
   syn vernacular :: Vernacular
                  
 sem Module                 
-  | Module lhs.vernacular = mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+  | Module lhs.vernacular = trace (show @dependencies) $ mkVernacular @types @constrMap @modulename.name @decls.declsDeps
            loc.constrMap = M.fromList @decls.constrAssocs
+           loc.dependencies = @decls.names `difference` (associate @constrMap @decls.dependencies)
 
 -- Associate constructor names with the data type they belong to.
 attr Decl Decls
@@ -102,3 +105,27 @@ sem Decl
     InstSig AnnPragma FunBind PatBind
      lhs.constrAssocs = []
 
+{
+groupLetDefinitions :: DeclDeps -> [GallinaLetDefinition]
+groupLetDefinitions = map groupLetDefinition . stronglyConnComp
+  where
+    groupLetDefinition :: SCC GallinaUngroupedDefinition -> GallinaLetDefinition
+    groupLetDefinition (AcyclicSCC x) = toDef x
+      where
+        toDef (GallinaUngroupedInd _              ) = error "groupLetDefinition: data types not allowed"
+        toDef (GallinaUngroupedFunOrPat (Left b)  ) = GallinaLetFunction b
+        toDef (GallinaUngroupedFunOrPat (Right b) ) = GallinaLetPatBinding b
+    groupLetDefinition (CyclicSCC ((GallinaUngroupedInd _):_)) = error "groupLetDefinition: data types not allowed"
+    groupLetDefinition (CyclicSCC [GallinaUngroupedFunOrPat b]) = GallinaLetFixpoint b
+    groupLetDefinition (CyclicSCC _) = error "groupLetDefinition: CyclicSCC should have list argument of length 1."
+
+}
+
+attr Binds
+  syn definitions :: {[GallinaLetDefinition]}
+
+sem Binds
+  | BDecls
+     lhs.definitions = groupLetDefinitions @decls.declsDeps
+  | IPBinds
+     lhs.definitions = error "Implicit parameters unsupported"

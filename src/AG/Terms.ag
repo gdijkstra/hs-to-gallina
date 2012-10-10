@@ -1,6 +1,12 @@
 -- Conversion of definitions of terms, i.e. function definitions and
 -- pattern bindings.
 
+{
+attachBindings :: GallinaTerm -> [GallinaLetDefinition] -> GallinaTerm
+attachBindings t []       = t
+attachBindings t bs@(_:_) = GallinaLet bs t
+}
+
 attr Matches Match
   syn arity :: Int
 
@@ -21,7 +27,7 @@ sem Matches
 sem Match                    
   | Match
      lhs.arity = @pats.arity
-     lhs.gallinaMatch = GallinaMatch @pats.gallinaPats @rhs.term
+     lhs.gallinaMatch = GallinaMatch @pats.gallinaPats (attachBindings @rhs.term @binds.definitions)
 
 
 -- Conversion of patterns.
@@ -114,7 +120,7 @@ sem Exp
   | NegApp          lhs.term = error "Unsupported: negate app"
   | InfixApp        lhs.term = error "Unsupported: infix app"
   | IPVar           lhs.term = error "Unsupported: implicit var"
-  | Let             lhs.term = error "Unsupported: let"
+  | Let             lhs.term = attachBindings @exp.term @binds.definitions
   | If              lhs.term = error "Unsupported: if"
   | Do              lhs.term = error "Unsupported: do"
   | MDo             lhs.term = error "Unsupported: mdo"
@@ -163,7 +169,7 @@ sem Alts
   | Cons lhs.matches = @hd.match : @tl.matches
 
 sem Alt
-  | Alt lhs.match = GallinaMatch [@pat.gallinaPat] @guardedalts.term
+  | Alt lhs.match = GallinaMatch [@pat.gallinaPat] (attachBindings @guardedalts.term @binds.definitions)
  
 attr GuardedAlts
   syn term :: GallinaTerm

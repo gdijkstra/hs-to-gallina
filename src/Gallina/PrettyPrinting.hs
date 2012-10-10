@@ -25,7 +25,10 @@ ppVernacular = render . pp
 
 ppGroup :: (Pp a) => String -> [a] -> Doc
 ppGroup name is = text name <+> vsep (intersperse (text "with") . map pp $ is)
-                  <> text "."
+
+ppGroupDotted :: (Pp a) => String -> [a] -> Doc
+ppGroupDotted name is = ppGroup name is <> text "."
+
 
 instance Pp Vernacular where
   pp a = vsep [text "Module" <+> text (moduleName a) <> text "."
@@ -40,10 +43,15 @@ instance Pp GallinaUngroupedDefinition where
   pp a = text "Ungrouped" <> pp a
 
 instance Pp GallinaDefinition where
-  pp (GallinaInductive is ) = ppGroup "Inductive" is
-  pp (GallinaFixpoint is  ) = ppGroup "Fixpoint" is
-  pp (GallinaFunction b   ) = ppGroup "Definition" [b]
-  pp (GallinaPatBinding b ) = ppGroup "Definition" [b]
+  pp (GallinaInductive is ) = ppGroupDotted "Inductive" is
+  pp (GallinaFixpoint is  ) = ppGroupDotted "Fixpoint" is
+  pp (GallinaFunction b   ) = ppGroupDotted "Definition" [b]
+  pp (GallinaPatBinding b ) = ppGroupDotted "Definition" [b]
+
+instance Pp GallinaLetDefinition where
+  pp (GallinaLetFixpoint b   ) = ppGroup "fix" [b]
+  pp (GallinaLetFunction b   ) = ppGroup "" [b]
+  pp (GallinaLetPatBinding b ) = ppGroup "" [b]
 
 instance Pp GallinaInductiveBody where
   pp a = hsep [ text (inductiveName a)
@@ -64,6 +72,7 @@ instance Pp GallinaConstructor where
               , pp (constrType a)
               ]
 
+ppArg :: (Pp a) => Maybe a -> Int -> Doc
 ppArg Nothing  no = text ('x' : show no)
 ppArg (Just t) no = parens . hsep $ [text ('x' : show no), text ":", pp t]
 
@@ -152,5 +161,7 @@ instance Pp GallinaTerm where
   ppPrec _ (GallinaCase e ms ) = text "match" <+> commas (map pp e) <+> text "with"
                                  $+$ nest 2 (vcat (map pp ms))
                                  $+$ text "end"
+  ppPrec _ (GallinaLet ds e  ) = foldr (\x y -> text "let" <+> pp x $+$ text "in" <+> y) (pp e) ds
+
 
 

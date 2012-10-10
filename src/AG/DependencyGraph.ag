@@ -1,14 +1,21 @@
 sem Decl                     
   | DataDecl 
-     loc.dependencies = @qualcondecls.dependencies
+     loc.dependencasdf = @qualcondecls.dependencies
+     loc.dependencies = trace (@declName ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
   | FunBind
-     loc.dependencies = @matches.dependencies
+     loc.dependencasdf = @matches.dependencies
+     loc.dependencies = trace (@declName ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
   | PatBind
-     loc.dependencies = @rhs.dependencies
+     loc.dependencasdf = @binds.dependencies
+                         ++ (@binds.names `difference` @rhs.dependencies)
+     loc.dependencies = trace (@declName ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
+  | TypeSig
+     loc.dependencasdf = typeDeps @ty.gallinaType
+     loc.dependencies = trace (show @names.names ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
 
 
 attr Match Matches Rhs Exp QualConDecl QualConDecls ConDecl BangType
-  BangTypes Type Alt Alts GuardedAlts
+  BangTypes Type Alt Alts GuardedAlts Binds Decls Decl
   syn dependencies :: {[String]}
 
 sem Matches
@@ -19,7 +26,9 @@ sem Matches
 
 sem Match                    
   | Match
-     lhs.dependencies = (concatMap patVars @pats.gallinaPats) `difference` @rhs.dependencies
+     loc.dependencies = ((concatMap patVars @pats.gallinaPats) ++ @binds.names)
+                        `difference`
+                        (@rhs.dependencies ++ @binds.dependencies)
 
 sem Rhs
   | UnGuardedRhs
@@ -41,8 +50,11 @@ sem Exp
      lhs.dependencies = @exp.dependencies ++ @alts.dependencies
   | Paren
      lhs.dependencies = @exp.dependencies
+  | Let
+     lhs.dependencies = @binds.dependencies
+                        ++ (@binds.names `difference` @exp.dependencies)
 
-  | NegApp InfixApp IPVar Let If Do MDo Tuple TupleSection List BracketExp
+  | NegApp InfixApp IPVar If Do MDo Tuple TupleSection List BracketExp
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
@@ -84,7 +96,7 @@ sem Type
   | TyApp
      lhs.dependencies = @ty.dependencies ++ @ty1.dependencies
   | TyVar
-     lhs.dependencies = [@name.name]
+     lhs.dependencies = []
   | TyCon
      lhs.dependencies = [@qname.name]
   | TyParen
@@ -107,3 +119,58 @@ sem GuardedAlts
      lhs.dependencies = @exp.dependencies           
   | GuardedAlts
      lhs.dependencies = error "dependencies: Unsupported construct guardedalts"
+
+attr Binds Decls Decl
+  syn names :: {[String]}
+
+sem Binds
+  | BDecls
+     lhs.names = @decls.names
+     lhs.dependencies = []
+  | IPBinds
+     lhs.names = error "implicit parameters unsupported"
+     lhs.dependencies = []
+
+sem Decls
+  | Nil
+     lhs.names = []
+     lhs.dependencies = []
+  | Cons
+     lhs.names = @hd.names ++ @tl.names
+     lhs.dependencies = @hd.names `difference` (@hd.dependencies ++ @tl.dependencies)
+
+sem Decl                     
+  | DataDecl 
+     lhs.names = [@indName]
+  | FunBind
+     lhs.names = [@matches.name]
+  | PatBind
+     lhs.names = [@pat.var]
+  | TypeSig
+     lhs.names = @names.names
+                
+-- The following constructors aren't implemented.
+ | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+   GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
+   SpliceDecl ForImp ForExp RulePragmaDecl DeprPragmaDecl 
+   WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 
+   InstSig AnnPragma 
+     lhs.names = error "Unsupported declarations"
+
+sem Decl                     
+  | DataDecl 
+     lhs.dependencies = @dependencies
+  | FunBind
+     lhs.dependencies = @dependencies
+  | PatBind
+     lhs.dependencies = @dependencies
+  | TypeSig
+     lhs.dependencies = @dependencies
+
+-- The following constructors aren't implemented.
+ | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+   GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
+   SpliceDecl ForImp ForExp RulePragmaDecl DeprPragmaDecl 
+   WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 
+   InstSig AnnPragma 
+     lhs.dependencies = error "Unsupported declarations"                
