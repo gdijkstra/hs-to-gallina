@@ -32,5 +32,7 @@ attr TyVarBinds
   syn params :: {[String]}
             
 sem TyVarBinds
-  | Nil  lhs.params = []
-  | Cons lhs.params = @hd.name : @tl.params
+  | Nil
+     lhs.params = []
+  | Cons
+     lhs.params = @hd.name : @tl.params

@@ -81,9 +81,10 @@ attr Module
   syn vernacular :: Vernacular
                  
 sem Module                 
-  | Module lhs.vernacular = trace (show @dependencies) $ mkVernacular @types @constrMap @modulename.name @decls.declsDeps
-           loc.constrMap = M.fromList @decls.constrAssocs
-           loc.dependencies = @decls.names `difference` (associate @constrMap @decls.dependencies)
+  | Module
+     lhs.vernacular = trace (show @dependencies) $ mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+     loc.constrMap = M.fromList @decls.constrAssocs
+     loc.dependencies = @decls.names `difference` (associate @constrMap @decls.dependencies)
 
 -- Associate constructor names with the data type they belong to.
 attr Decl Decls

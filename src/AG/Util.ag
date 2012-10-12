@@ -12,8 +12,10 @@ attr Names
   syn names :: {[String]}
 
 sem Names
-  | Nil lhs.names = []
-  | Cons lhs.names = @hd.name : @tl.names
+  | Nil
+     lhs.names = []
+  | Cons
+     lhs.names = @hd.name : @tl.names
 
 attr ModuleName Name QName TyVarBind Matches Match
   syn name :: String

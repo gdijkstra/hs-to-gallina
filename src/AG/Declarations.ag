@@ -2,8 +2,10 @@ attr Decls
   syn declsDeps :: {[(GallinaUngroupedDefinition, String, [String])]}
 
 sem Decls
-  | Nil  lhs.declsDeps = []
-  | Cons lhs.declsDeps = @hd.declsDeps ++ @tl.declsDeps
+  | Nil
+     lhs.declsDeps = []
+  | Cons
+     lhs.declsDeps = @hd.declsDeps ++ @tl.declsDeps
 
 attr Decl                          
   syn declsDeps :: {[(GallinaUngroupedDefinition, String, [String])]}
