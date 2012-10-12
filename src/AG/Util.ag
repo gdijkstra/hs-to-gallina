@@ -3,6 +3,9 @@
 {
 difference :: Eq a => [a] -> [a] -> [a]
 difference b a = filter (`notElem` b) a
+
+third :: (c -> d) -> (a, b, c) -> (a, b, d)
+third f = \(a, b, c) -> (a, b, f c)
 }
 
 

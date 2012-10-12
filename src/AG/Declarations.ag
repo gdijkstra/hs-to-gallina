@@ -46,7 +46,7 @@ sem Decl
                             , @dependencies
                                     )
   | PatBind
-     loc.gallinaDecl = mkPatBindDefDecl @declName Nothing (attachBindings @rhs.term @binds.definitions)
+     loc.gallinaDecl = mkPatBindDefDecl @declName Nothing (attachBindings @rhs.gallinaTerm @binds.definitions)
      lhs.declsDeps = return ( @gallinaDecl 
                             , @declName
                             , @dependencies

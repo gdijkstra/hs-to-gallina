@@ -93,6 +93,7 @@ data GallinaTerm =
   | GallinaLam [String] GallinaTerm
   | GallinaCase [GallinaTerm] [GallinaMatch]
   | GallinaLet [GallinaLetDefinition] GallinaTerm
+  | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   deriving Show
 
 generalise :: GallinaType -> GallinaType

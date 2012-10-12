@@ -59,9 +59,6 @@ associateTypes types declDeps = map f declDeps
 
 associateConstrs :: Map String String -> DeclDeps -> DeclDeps
 associateConstrs constrMap declDeps = map (third (associate constrMap)) declDeps
-  where
-    third :: (c -> d) -> (a, b, c) -> (a, b, d)
-    third f = \(a, b, c) -> (a, b, f c)
 
 associate :: Map String String -> [String] -> [String]
 associate constrMap names = map (\x -> M.findWithDefault x x constrMap) names
@@ -71,10 +68,9 @@ mkVernacular types constrMap name ungroupedDefs =
   let typedDefs = associateTypes types . associateConstrs constrMap $ ungroupedDefs
       sccs = stronglyConnComp typedDefs
       groupedDefs = map groupDefinitions sccs
-  in trace (show . map ppSCC $ sccs)
-     $ Vernacular { moduleName = name
-                  , moduleDefinitions = groupedDefs
-                  }
+  in Vernacular { moduleName = name
+                , moduleDefinitions = groupedDefs
+                }
 }
 
 attr Module
@@ -82,7 +78,7 @@ attr Module
                  
 sem Module                 
   | Module
-     lhs.vernacular = trace (show @dependencies) $ mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+     lhs.vernacular = mkVernacular @types @constrMap @modulename.name @decls.declsDeps
      loc.constrMap = M.fromList @decls.constrAssocs
      loc.dependencies = @decls.names `difference` (associate @constrMap @decls.dependencies)
 
@@ -98,7 +94,7 @@ sem Decls
 
 sem Decl
   | DataDecl
-     lhs.constrAssocs = map (\x -> (constrName x, @indName)) @constrs
+     lhs.constrAssocs = map (\x -> (constrName x, @declName)) @constrs
   | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
     GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
     SpliceDecl TypeSig ForImp ForExp RulePragmaDecl DeprPragmaDecl 

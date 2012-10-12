@@ -2,7 +2,6 @@ imports
 {
 import           Data.Graph
 import           Data.List
-import           Debug.Trace
 import           Gallina.Syntax
 import           Language.Haskell.Exts.Pretty
 import           Language.Haskell.Exts.Syntax

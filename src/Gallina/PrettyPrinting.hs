@@ -162,6 +162,7 @@ instance Pp GallinaTerm where
                                  $+$ nest 2 (vcat (map pp ms))
                                  $+$ text "end"
   ppPrec _ (GallinaLet ds e  ) = foldr (\x y -> text "let" <+> pp x $+$ text "in" <+> y) (pp e) ds
-
-
-
+  ppPrec _ (GallinaIf c t f  ) = sep [ text "if", pp c
+                                     , text "then", pp t
+                                     , text "else", pp f
+                                     ]
