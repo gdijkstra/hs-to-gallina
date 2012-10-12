@@ -1,0 +1,12 @@
+*.aux
+*.log
+*.nav
+*.out
+*.ptb
+*.toc
+*.snm
+proposal/proposal.pdf
+proposal/proposal.tex
+*.synctex.gz
+*.bbl
+*.blg
