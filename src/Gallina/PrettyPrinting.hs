@@ -2,7 +2,7 @@ module Gallina.PrettyPrinting where
 
 import           Data.List
 import           Gallina.Syntax
-import           Text.PrettyPrint.HughesPJ
+import           Text.PrettyPrint
 
 class Pp a where
   pp     :: a -> Doc
