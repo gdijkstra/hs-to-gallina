@@ -1,17 +1,13 @@
 sem Decl                     
   | DataDecl 
-     loc.dependencasdf = @qualcondecls.dependencies
-     loc.dependencies = trace (@declName ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
+     loc.dependencies = @qualcondecls.dependencies
   | FunBind
-     loc.dependencasdf = @matches.dependencies
-     loc.dependencies = trace (@declName ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
+     loc.dependencies = @matches.dependencies
   | PatBind
-     loc.dependencasdf = @binds.dependencies
+     loc.dependencies = @binds.dependencies
                          ++ (@binds.names `difference` @rhs.dependencies)
-     loc.dependencies = trace (@declName ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
   | TypeSig
-     loc.dependencasdf = typeDeps @ty.gallinaType
-     loc.dependencies = trace (show @names.names ++ ": " ++ show @dependencasdf ++ "\n") $ @dependencasdf
+     loc.dependencies = typeDeps @ty.gallinaType
 
 
 attr Match Matches Rhs Exp QualConDecl QualConDecls ConDecl BangType
@@ -120,32 +116,37 @@ sem GuardedAlts
   | GuardedAlts
      lhs.dependencies = error "dependencies: Unsupported construct guardedalts"
 
+sem Binds
+  | BDecls
+     lhs.dependencies = @decls.dependencies
+  | IPBinds
+     lhs.dependencies = error "implicit parameters unsupported"
+
+sem Decls
+  | Nil
+     lhs.dependencies = []
+  | Cons
+     lhs.dependencies = @hd.names `difference` (@hd.dependencies ++ @tl.dependencies)
+
 attr Binds Decls Decl
   syn names :: {[String]}
+
 
 sem Binds
   | BDecls
      lhs.names = @decls.names
-     lhs.dependencies = []
   | IPBinds
      lhs.names = error "implicit parameters unsupported"
-     lhs.dependencies = []
 
 sem Decls
   | Nil
      lhs.names = []
-     lhs.dependencies = []
   | Cons
      lhs.names = @hd.names ++ @tl.names
-     lhs.dependencies = @hd.names `difference` (@hd.dependencies ++ @tl.dependencies)
 
 sem Decl                     
-  | DataDecl 
-     lhs.names = [@indName]
-  | FunBind
-     lhs.names = [@matches.name]
-  | PatBind
-     lhs.names = [@pat.var]
+  | DataDecl FunBind PatBind
+     lhs.names = [@declName]
   | TypeSig
      lhs.names = @names.names
                 
