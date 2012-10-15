@@ -16,35 +16,23 @@ Verifying Haskell programs in Coq}
 
 \maketitle
 
-% Main goal: write verified Haskell code?
-% Means: via Coq's extraction mechanism.
+Suppose we want to verify software written in Haskell, using a proof
+assistant like Coq. Before we can start verifying, we first need to
+write a model of our software in the proof assistant's specification
+language. Manual translation of Haskell code into Coq's Gallina code
+is tedious and more importantly, prone to subtle mistakes. 
 
-% Do we suppose we have some Haskell code? Or do we suppose we want to
-% write Haskell code first to prototype stuff?
+We want to write a tool that automatically translate Haskell code to
+Gallina code. However, since Coq only allows structural recursion, not
+all Haskell definitions can translated directly into Gallina. In order
+to deal with some of these cases, we can generate Bove-Capretta
+predicates from the original function definition and rewrite the
+function definition using this predicate.
 
-% Situation
-% In order to write verified software:
-% We need model/write program in Coq
-
-% Either way: writing software in Coq is a pain: specifically
-% termination.
-
-% Manual translation Haskell -> Coq is tedious and prone to errors.
-
-% Propose: automatic translation of Haskell to Coq. Via the AST with
-% all the sugar.
-
-% In order to deal with general recursion, we also want to
-% automatically create Bove-Capretta predicates from our function
-% definition.
-
-% Alternative: translate GHC Core -> Coq and use a special monad to
-% deal with partiality.
-% The extracted code will not as directly match the original code.
-
-% Experiment with these methods: compare examples.
-
-
-
+Another limitation of a direct translation is that in Coq there is a
+distinction between inductive and coinductive data types. If we want
+to work with infinite lists in Coq, we have to make a separate
+coinductive data type. We also want our tool to be able to assist in
+this process.
 
 \end{document}
