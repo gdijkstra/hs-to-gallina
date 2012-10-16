@@ -1,6 +1,7 @@
 module Gallina.Syntax where
 
 import           Data.List
+import           Data.Maybe
 
 data Vernacular =
   Vernacular
@@ -128,6 +129,22 @@ unflatTy [x]    = Just x
 unflatTy (x:xs) = do
   uxs <- unflatTy xs
   return $ GallinaTyFun x uxs
+
+argsResTy :: Int -> GallinaType -> ([GallinaType], GallinaType)
+argsResTy arity (GallinaTyForall _ ty) = argsResTy arity ty
+argsResTy arity ty@(GallinaTyFun _ _ ) = ( take arity . flatTy $ ty
+                                         , fromMaybe errorMsg . unflatTy
+                                           . drop arity . flatTy $ ty
+                                         )
+  where
+    errorMsg = error "argsResTy: unflattening failed: arity too high"
+argsResTy _     _                      = error "argsResTy: not a function type"
+
+argsTy :: Int -> GallinaType -> GallinaType
+argsTy arity ty = fromJust . unflatTy . fst . argsResTy arity $ ty
+
+resTy :: Int -> GallinaType -> GallinaType
+resTy arity ty = snd . argsResTy arity $ ty
 
 -- Utility function on patterns.
 patVars :: GallinaPat -> [String]

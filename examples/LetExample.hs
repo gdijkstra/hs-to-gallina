@@ -40,5 +40,3 @@ lengthTest' = len test
 
 data Nat = Zero
          | Succ Nat
-
-

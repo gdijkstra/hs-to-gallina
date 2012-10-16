@@ -102,7 +102,7 @@ instance Pp GallinaFunctionBody where
         _ -> []
       (args, res) = case t of
         Nothing -> (replicate a Nothing, Nothing)
-        Just x -> (map Just $ take a (flatTy x), unflatTy $ drop a (flatTy x))
+        Just x -> (\(as,r) -> (map Just as, Just r)) (argsResTy a x)
 
 instance Pp GallinaPatBindingBody where
   pp (GallinaPatBindingBody n t b) = hsep [ text n
