@@ -56,7 +56,9 @@ instance Pp GallinaLetDefinition where
 instance Pp GallinaInductiveBody where
   pp a = hsep [ text (inductiveName a)
               , params
-              , text ": Set :="
+              , text ":"
+              , pp (inductiveType a)
+              , text ":="
                 $+$
                 nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a)))
               ]
@@ -98,19 +100,9 @@ instance Pp GallinaFunctionBody where
       freeVars = case t of
         (Just (GallinaTyForall vars _)) -> vars
         _ -> []
-      flat (GallinaTyForall _ ty ) = flat ty
-      flat (GallinaTyFun l r     ) = l : flat r
-      flat ty@(GallinaTyApp _ _  ) = [ty]
-      flat ty@(GallinaTyVar _    ) = [ty]
-      flat ty@(GallinaTyCon _    ) = [ty]
-      unflat []     = Nothing
-      unflat [x]    = Just x
-      unflat (x:xs) = do
-        uxs <- unflat xs
-        return $ GallinaTyFun x uxs
       (args, res) = case t of
         Nothing -> (replicate a Nothing, Nothing)
-        Just x -> (map Just $ take a (flat x), unflat $ drop a (flat x))
+        Just x -> (map Just $ take a (flatTy x), unflatTy $ drop a (flatTy x))
 
 instance Pp GallinaPatBindingBody where
   pp (GallinaPatBindingBody n t b) = hsep [ text n
@@ -150,6 +142,7 @@ instance Pp GallinaType where
   ppPrec p (GallinaTyApp l r    ) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
   ppPrec _ (GallinaTyVar s      ) = text s
   ppPrec _ (GallinaTyCon s      ) = text s
+  ppPrec _ (GallinaTySet        ) = text "Set"
 
 instance Pp GallinaTerm where
   ppPrec _ (GallinaVar s     ) = text s

@@ -32,7 +32,7 @@ sem Decl
 sem Decl                     
   | DataDecl 
      lhs.declsDeps = return ( GallinaUngroupedInd $
-                              GallinaInductiveBody @declName @params @constrs 
+                              GallinaInductiveBody @declName @params GallinaTySet @constrs 
                             , @declName
                             , @dependencies
                             )

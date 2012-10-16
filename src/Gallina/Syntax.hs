@@ -32,6 +32,7 @@ data GallinaLetDefinition =
 data GallinaInductiveBody =
   GallinaInductiveBody { inductiveName    :: String
                        , inductiveParams  :: [String]
+                       , inductiveType    :: GallinaType
                        , inductiveConstrs :: [GallinaConstructor] }
   deriving Show
 
@@ -84,6 +85,7 @@ data GallinaType =
   | GallinaTyApp GallinaType GallinaType
   | GallinaTyVar String
   | GallinaTyCon String
+  | GallinaTySet
   deriving Show
 
 
@@ -96,19 +98,40 @@ data GallinaTerm =
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   deriving Show
 
+-- Utility functions on types.
 generalise :: GallinaType -> GallinaType
 generalise ty = let vars = ftv ty in if not (null vars)
                                      then GallinaTyForall vars ty
                                      else ty
 
 ftv :: GallinaType -> [String]
-ftv (GallinaTyForall _ _) = error "ftv: foralls should not occur here"
-ftv (GallinaTyFun l r) = union (ftv l) (ftv r)
-ftv (GallinaTyApp l r) = union (ftv l) (ftv r)
-ftv (GallinaTyVar str) = return str
-ftv (GallinaTyCon _) = []
+ftv (GallinaTyForall _ _ ) = error "ftv: foralls should not occur here"
+ftv (GallinaTyFun l r    ) = union (ftv l) (ftv r)
+ftv (GallinaTyApp l r    ) = union (ftv l) (ftv r)
+ftv (GallinaTyVar str    ) = return str
+ftv (GallinaTyCon _      ) = []
+ftv (GallinaTySet        ) = []
 
+-- Replace the GallinaTy constructor by (:).
+flatTy :: GallinaType -> [GallinaType]
+flatTy (GallinaTyForall _ ty ) = flatTy ty
+flatTy (GallinaTyFun l r     ) = l : flatTy r
+flatTy ty@(GallinaTyApp _ _  ) = [ty]
+flatTy ty@(GallinaTyVar _    ) = [ty]
+flatTy ty@(GallinaTyCon _    ) = [ty]
+flatTy ty@(GallinaTySet      ) = [ty]
+
+-- Inverse of flatTy.
+unflatTy :: [GallinaType] -> Maybe GallinaType
+unflatTy []     = Nothing
+unflatTy [x]    = Just x
+unflatTy (x:xs) = do
+  uxs <- unflatTy xs
+  return $ GallinaTyFun x uxs
+
+-- Utility function on patterns.
 patVars :: GallinaPat -> [String]
-patVars (GallinaPVar s) = [s]
-patVars (GallinaPApp s ps) = s : concatMap patVars ps
-patVars GallinaPWildCard = []
+patVars (GallinaPVar s    ) = [s]
+patVars (GallinaPApp s ps ) = s : concatMap patVars ps
+patVars GallinaPWildCard    = []
+

@@ -35,6 +35,7 @@ typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyVar _         ) = []
 typeDeps (GallinaTyCon v         ) = [v]
+typeDeps (GallinaTySet           ) = []
 
 associateTypes :: Map String GallinaType -> DeclDeps -> DeclDeps 
 associateTypes types declDeps = map f declDeps
