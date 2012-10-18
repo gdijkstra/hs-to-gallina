@@ -1,4 +1,5 @@
 import           AG
+import           BoveCapretta
 import           Data.Foldable
 import           Gallina.PrettyPrinting
 import           Language.Haskell.Exts
@@ -29,7 +30,7 @@ convertFile args = do
   res <- parseFile . filePath $ args
   case res of
     ParseOk m -> do
-      let output = ppVernacular . convertToGallina $ m
+      let output = ppVernacular . uncurry applyBoveCapretta . convertToGallina $ m
       putStrLn output
       forM_ (writePath $ args) (\outfp -> writeFile outfp output)
     ParseFailed _ _ -> putStrLn "convertFile: Parsing Haskell file failed."

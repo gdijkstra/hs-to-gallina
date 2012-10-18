@@ -143,6 +143,13 @@ instance Pp GallinaType where
   ppPrec _ (GallinaTyVar s      ) = text s
   ppPrec _ (GallinaTyCon s      ) = text s
   ppPrec _ (GallinaTySet        ) = text "Set"
+  ppPrec p (GallinaTyPi s t1 t2 ) = parensIf (p > 0) $ hsep [ text "forall"
+                                                            , text s
+                                                            , text ":"
+                                                            , pp t1
+                                                            , text ","
+                                                            , pp t2
+                                                            ]
 
 instance Pp GallinaTerm where
   ppPrec _ (GallinaVar s     ) = text s

@@ -30,6 +30,7 @@ ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
 ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
 
 typeDeps :: GallinaType -> [String]
+typeDeps (GallinaTyPi _ _ _      ) = error "typeDeps: pi types should not occur here"
 typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
 typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
@@ -75,11 +76,13 @@ mkVernacular types constrMap name ungroupedDefs =
 }
 
 attr Module
-  syn vernacular :: Vernacular
+  syn result :: Result
                  
 sem Module                 
   | Module
-     lhs.vernacular = mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+     lhs.result = ( mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+                  , @bcFunctions
+                  )
      loc.constrMap = M.fromList @decls.constrAssocs
      loc.dependencies = @decls.names `difference` (associate @constrMap @decls.dependencies)
 

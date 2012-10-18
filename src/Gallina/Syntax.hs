@@ -31,10 +31,12 @@ data GallinaLetDefinition =
   deriving Show
 
 data GallinaInductiveBody =
-  GallinaInductiveBody { inductiveName    :: String
-                       , inductiveParams  :: [String]
-                       , inductiveType    :: GallinaType
-                       , inductiveConstrs :: [GallinaConstructor] }
+  GallinaInductiveBody
+  { inductiveName    :: String
+  , inductiveParams  :: [String]
+  , inductiveType    :: GallinaType
+  , inductiveConstrs :: [GallinaConstructor]
+  }
   deriving Show
 
 
@@ -87,6 +89,7 @@ data GallinaType =
   | GallinaTyVar String
   | GallinaTyCon String
   | GallinaTySet
+  | GallinaTyPi String GallinaType GallinaType
   deriving Show
 
 
@@ -107,6 +110,7 @@ generalise ty = let vars = ftv ty in if not (null vars)
 
 ftv :: GallinaType -> [String]
 ftv (GallinaTyForall _ _ ) = error "ftv: foralls should not occur here"
+ftv (GallinaTyPi _ _ _   ) = error "ftv: pi types should not occur here"
 ftv (GallinaTyFun l r    ) = union (ftv l) (ftv r)
 ftv (GallinaTyApp l r    ) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str    ) = return str
@@ -121,6 +125,7 @@ flatTy ty@(GallinaTyApp _ _  ) = [ty]
 flatTy ty@(GallinaTyVar _    ) = [ty]
 flatTy ty@(GallinaTyCon _    ) = [ty]
 flatTy ty@(GallinaTySet      ) = [ty]
+flatTy (GallinaTyPi _ _ _    ) = error "flatTy: pi types should not occur here"
 
 -- Inverse of flatTy.
 unflatTy :: [GallinaType] -> Maybe GallinaType

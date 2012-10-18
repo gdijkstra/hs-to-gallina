@@ -23,7 +23,7 @@ sem Decl
 
 -- Conversion of Haskell types to Gallina types.
 attr BangTypes QualConDecls QualConDecl ConDecl
-  inh dataName :: String -- Needed for types of constructors
+  inh dataName :: GallinaType -- Needed for types of constructors
 
 {
 ppParams :: [String] -> String
@@ -33,14 +33,15 @@ ppParams xs@(_:_) = ' ' : unwords xs
 
 sem Decl
   | DataDecl
-     qualcondecls.dataName = @name.name ++ ppParams @tyvarbinds.params
+     qualcondecls.dataName = foldl GallinaTyApp (GallinaTyCon @name.name)
+                             . map GallinaTyVar $ @tyvarbinds.params
 
 attr BangTypes BangType Type
   syn gallinaType :: GallinaType
                      
 sem BangTypes
   | Nil
-     lhs.gallinaType = GallinaTyCon @lhs.dataName
+     lhs.gallinaType = @lhs.dataName
   | Cons
      lhs.gallinaType = GallinaTyFun @hd.gallinaType @tl.gallinaType
                   

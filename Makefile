@@ -1,6 +1,6 @@
 CABAL-CONFIGURE-FLAGS := --user
 CABAL-BUILD-FLAGS     :=
-TESTFILE=examples/LetExample.hs
+TESTFILE=examples/BCExample.hs
 TESTFILEBN=$(basename $(TESTFILE))
 
 default : test
