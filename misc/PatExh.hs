@@ -2,10 +2,17 @@ module PatExh where
 
 import           Control.Arrow
 import           Control.Monad
+import           Data.List
 import           Data.Maybe
 import           Debug.Trace
-import           System.IO.Unsafe
 import           System.Random
+
+data GallinaPatAnnotated =
+  GallinaPVarAnn String GallinaType
+  | GallinaPAppAnn String [GallinaPatAnnotated]
+    deriving (Show, Eq)
+
+type MultiPattern = [GallinaPatAnnotated]
 
 data GallinaPat =
   GallinaPVar String
@@ -18,100 +25,115 @@ data GallinaType =
   | GallinaTyCon String
     deriving (Show, Eq)
 
-testPats :: [GallinaPat]
+testPats :: [MultiPattern]
 testPats =
-  [ GallinaPApp "Zero" []
-  , GallinaPApp "Succ" [GallinaPApp "Succ" [GallinaPApp "Zero" []]]
+  [ [GallinaPAppAnn "Zero" []]
+  , [GallinaPAppAnn "Succ" [GallinaPAppAnn "Succ" [GallinaPAppAnn "Zero" []]]]
   ]
 
-testPatsInc :: [GallinaPat]
+testPatsInc :: [MultiPattern]
 testPatsInc =
-  [ GallinaPApp "Zero" []
-  , GallinaPApp "Succ" [GallinaPApp "Zero" []]
+  [ [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Zero" []]
+  , [GallinaPAppAnn "Succ" [GallinaPVarAnn "n" (GallinaTyCon "Nat")], GallinaPAppAnn "Zero" []]
   ]
 
--- We assume that length ps0 == length ps1, i.e. no malformed pats.
-unify :: GallinaPat -> GallinaPat -> Maybe Substs
-unify (GallinaPVar v     ) p = Just $ Subst v p
-unify (GallinaPApp _ _   ) (GallinaPVar _) = Nothing
-unify (GallinaPApp c0 ps0) (GallinaPApp c1 ps1)
-  | c0 /= c1 = Nothing
-  | otherwise = do
-    substs <- sequence . map (uncurry unify) $ zip ps0 ps1
-    return . foldr Compose IdSubst $ substs
+testMultiPat :: [MultiPattern]
+testMultiPat = [ [GallinaPAppAnn "Zero" [], GallinaPVarAnn "x" (GallinaTyCon "Nat")]
+               , [GallinaPVarAnn "Succ x" (GallinaTyCon "Nat"), GallinaPAppAnn "Zero" []]
+               ]
 
-missingPats :: [GallinaPat] -> [GallinaPat]
-missingPats pats = algorithm initialPatSubs initialIdealPat
-  where
-    initialPatSubs = map (\x -> (x, Subst idealVar x)) pats
-    initialIdealPat = GallinaPVar idealVar
-    idealVar = "'ideal"
-
-data Substs =
-  Compose Substs Substs
-  | Subst String GallinaPat
+data MultiPatSubst =
+  Compose MultiPatSubst MultiPatSubst
+  | Subst String GallinaPatAnnotated
   | IdSubst
     deriving Show
 
+ppMultiPats :: [MultiPattern] -> IO ()
+ppMultiPats mp = mapM_ putStrLn $ zipWith (\n p -> show n ++ " " ++ ppMultiPat p) [0..] mp
+
+ppMultiPat :: MultiPattern -> String
+ppMultiPat = unwords . intersperse "," . map ppPat
+
+ppPat :: GallinaPatAnnotated -> String
+ppPat (GallinaPAppAnn c args) = c ++ " " ++ (unwords . map ppPat $ args)
+ppPat (GallinaPVarAnn v _   ) = v
+
+-- We assume that length ps0 == length ps1, i.e. no malformed pats.
+unifyMultiPats :: MultiPattern -> MultiPattern -> Maybe MultiPatSubst
+unifyMultiPats l r = fmap (foldr Compose IdSubst)
+                     $ sequence
+                     $ zipWith unifyPatAnn l r
+
+unifyPatAnn :: GallinaPatAnnotated -> GallinaPatAnnotated -> Maybe MultiPatSubst
+unifyPatAnn (GallinaPVarAnn v _   ) p = Just $ Subst v p
+unifyPatAnn (GallinaPAppAnn _ _   ) (GallinaPVarAnn _ _) = Nothing
+unifyPatAnn (GallinaPAppAnn c0 ps0) (GallinaPAppAnn c1 ps1)
+  | c0 /= c1 = Nothing
+  | otherwise = do
+    substs <- sequence . map (uncurry unifyPatAnn) $ zip ps0 ps1
+    return . foldr Compose IdSubst $ substs
+
+applyMultiPatSubst :: MultiPatSubst -> MultiPattern -> MultiPattern
+applyMultiPatSubst = map . applyPatSubst
+
+applyPatSubst :: MultiPatSubst -> GallinaPatAnnotated -> GallinaPatAnnotated
+applyPatSubst IdSubst = id
+applyPatSubst (Compose l r) = applyPatSubst l . applyPatSubst r
+applyPatSubst (Subst var pat) = applySubst var pat
+  where
+    applySubst v0 pat0 pat1@(GallinaPVarAnn v1 _  ) = if v0 == v1 then pat0 else pat1
+    applySubst v0 pat0 (GallinaPAppAnn constr pats) = GallinaPAppAnn constr
+                                                      . map (applySubst v0 pat0)
+                                                      $ pats
+
+
+missingPats :: Int -> [MultiPattern] -> [MultiPattern]
+missingPats arity pats = algorithm initialPatSubs initialIdealMultiPat
+   where
+     initialPatSubs = zipWith (\p q -> (p, fromJust (unifyMultiPats q p)))
+                      pats
+                      (repeat initialIdealMultiPat)
+     initialIdealMultiPat = map (\n -> GallinaPVarAnn (idealVar n) (GallinaTyCon "Nat"))
+                            $ [0 .. (arity - 1)]
+     idealVar n = "'ideal" ++ show n
+
 -- Returns Nothing if the substs only rename variables to variables.
 -- Return Just x where x is a variable mapped to a non-variable.
-hasNonRenaming :: Substs -> Maybe String
-hasNonRenaming IdSubst = Nothing
-hasNonRenaming (Subst s p@(GallinaPApp _ _)) = Just s
-hasNonRenaming (Subst s (GallinaPVar _)) = Nothing
-hasNonRenaming (Compose l r) = hasNonRenaming l `mplus` hasNonRenaming r
+hasNonRenaming :: MultiPatSubst -> Maybe String
+hasNonRenaming IdSubst                          = Nothing
+hasNonRenaming (Subst s p@(GallinaPAppAnn _ _)) = Just $ (trace ("found: " ++ s)) s
+hasNonRenaming (Subst s (GallinaPVarAnn _ _)  ) = Nothing
+hasNonRenaming (Compose l r                   ) = hasNonRenaming l
+                                                  `mplus` hasNonRenaming r
 
-algorithm :: [(GallinaPat, Substs)] -> GallinaPat -> [GallinaPat]
-algorithm []       idealPat = [idealPat]
-algorithm a@((p1, s1):_) idealPat =
-  trace ("\nactual pats: " ++ show a ++ "\nideal pat: " ++ show idealPat ++ "\ninvariant holds: " ++ show (invariantHolds a idealPat)) $
+algorithm :: [(MultiPattern, MultiPatSubst)] -> MultiPattern -> [MultiPattern]
+algorithm []       idealMultiPat = [idealMultiPat]
+algorithm a@((p1, s1):_) idealMultiPat =
+  trace ("\nactual pats: " ++ show a ++ "\nideal pat: " ++ show idealMultiPat ++ "\ninvariant holds: " ++ show (invariantHolds a idealMultiPat)) $
   case hasNonRenaming s1 of
     Nothing -> if length a == 1 then [] else error "algorithm: overlap"
-    Just x -> let idealPats = splitVar x idealPat
-              in trace ("split on: " ++ show x ++ " --> " ++ show idealPats) $
-               concatMap (\q -> algorithm (refinePatSubs q a) q) idealPats
+    Just x -> let idealMultiPats = splitVar x idealMultiPat
+              in trace ("split on: " ++ show x ++ " --> " ++ show idealMultiPats) $
+               concatMap (\q -> algorithm (refineMultiPatSubs q a) q) idealMultiPats
 
 
-refinePatSubs :: GallinaPat -> [(GallinaPat, Substs)] -> [(GallinaPat, Substs)]
-refinePatSubs q = mapMaybe (\(pat, substs) -> case unify q pat of
-                               Just s -> Just (pat, s)
+refineMultiPatSubs :: MultiPattern -> [(MultiPattern, MultiPatSubst)] -> [(MultiPattern, MultiPatSubst)]
+refineMultiPatSubs q = mapMaybe (\(multipat, substs) -> case unifyMultiPats q multipat of
+                               Just s -> Just (multipat, s)
                                Nothing -> Nothing)
 
-
--- Remove all substitutions to variables that do not occur in the
--- given list of variables.
-simplify :: [String] -> Substs -> Substs
-simplify _    IdSubst = IdSubst
-simplify vars s@(Subst var pat) = if var `elem` vars
-                                  then s
-                                  else IdSubst
-simplify vars (Compose l r) = simplify vars l `Compose` simplify vars r
-
-
-patVars :: GallinaPat -> [String]
-patVars (GallinaPVar s    ) = [s]
-patVars (GallinaPApp s ps ) = s : concatMap patVars ps
-
-
-applySubsts :: Substs -> GallinaPat -> GallinaPat
-applySubsts IdSubst = id
-applySubsts (Compose l r) = applySubsts l . applySubsts r
-applySubsts (Subst var pat) = applySubst var pat
-  where
-    applySubst v0 pat0 pat1@(GallinaPVar v1    ) = if v0 == v1 then pat0 else pat1
-    applySubst v0 pat0 (GallinaPApp constr pats) = GallinaPApp constr
-                                                   . map (applySubst v0 pat0)
-                                                   $ pats
-
-invariantHolds :: [(GallinaPat, Substs)] -> GallinaPat -> Bool
-invariantHolds patsSubs idealPat = all (\(a,b) -> a == b)
-                                   . map (\(a,b) -> (a, applySubsts b idealPat))
-                                   $ patsSubs
+invariantHolds :: [(MultiPattern, MultiPatSubst)] -> MultiPattern -> Bool
+invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
+                                   . map (\(a,s) -> (a, applyMultiPatSubst s idealMultiPat))
+                                   $ multiPatsSubs
 
 -- splitVar should also get the type to find out how we have to split.
-splitVar :: String -> GallinaPat -> [GallinaPat]
-splitVar var ideal = map (\s -> applySubsts s ideal) substs where
+splitVar :: String -> MultiPattern -> [MultiPattern]
+splitVar var ideal = map (\s -> applyMultiPatSubst s ideal) substs where
   substs = map (Subst var) pats
-  pats = [GallinaPApp "Zero" [], GallinaPApp "Succ" [GallinaPVar "''p"]]
+  pats = [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Succ" [GallinaPVarAnn "'p" (GallinaTyCon "Nat")]]
 
 
+test = refineMultiPatSubs [GallinaPAppAnn "Succ" [GallinaPVarAnn "\'p" (GallinaTyCon "Nat")],GallinaPVarAnn "\'ideal1" (GallinaTyCon "Nat")] [([GallinaPAppAnn "Zero" [],GallinaPVarAnn "x" (GallinaTyCon "Nat")],Compose IdSubst (Compose (Subst "\'ideal1" (GallinaPVarAnn "x" (GallinaTyCon "Nat"))) IdSubst))]
+
+test1 = flip invariantHolds [GallinaPAppAnn "Succ" [GallinaPVarAnn "\'p" (GallinaTyCon "Nat")],GallinaPVarAnn "\'ideal1" (GallinaTyCon "Nat")] [([GallinaPAppAnn "Zero" [],GallinaPVarAnn "x" (GallinaTyCon "Nat")],Compose IdSubst (Compose (Subst "\'ideal1" (GallinaPVarAnn "x" (GallinaTyCon "Nat"))) IdSubst))]
