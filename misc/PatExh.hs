@@ -2,6 +2,7 @@ module PatExh where
 
 import           Control.Arrow
 import           Control.Monad
+import           Control.Monad.State
 import           Data.List
 import           Data.Maybe
 import           Debug.Trace
@@ -31,6 +32,12 @@ testPats =
   , [GallinaPAppAnn "Succ" [GallinaPAppAnn "Succ" [GallinaPAppAnn "Zero" []]]]
   ]
 
+testPatsSimple :: [MultiPattern]
+testPatsSimple =
+  [ [GallinaPAppAnn "Zero" [], GallinaPVarAnn "n" (GallinaTyCon "Nat")]
+  ]
+
+
 testPatsInc :: [MultiPattern]
 testPatsInc =
   [ [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Zero" []]
@@ -39,7 +46,7 @@ testPatsInc =
 
 testMultiPat :: [MultiPattern]
 testMultiPat = [ [GallinaPAppAnn "Zero" [], GallinaPVarAnn "x" (GallinaTyCon "Nat")]
-               , [GallinaPVarAnn "Succ x" (GallinaTyCon "Nat"), GallinaPAppAnn "Zero" []]
+               , [GallinaPAppAnn "Succ" [GallinaPVarAnn "x" (GallinaTyCon "Nat")], GallinaPAppAnn "Zero" []]
                ]
 
 data MultiPatSubst =
@@ -64,6 +71,8 @@ unifyMultiPats l r = fmap (foldr Compose IdSubst)
                      $ sequence
                      $ zipWith unifyPatAnn l r
 
+-- We assume that the patterns are linear, i.e. every variable in the
+-- multipattern occurs exactly once.
 unifyPatAnn :: GallinaPatAnnotated -> GallinaPatAnnotated -> Maybe MultiPatSubst
 unifyPatAnn (GallinaPVarAnn v _   ) p = Just $ Subst v p
 unifyPatAnn (GallinaPAppAnn _ _   ) (GallinaPVarAnn _ _) = Nothing
@@ -88,14 +97,14 @@ applyPatSubst (Subst var pat) = applySubst var pat
 
 
 missingPats :: Int -> [MultiPattern] -> [MultiPattern]
-missingPats arity pats = algorithm initialPatSubs initialIdealMultiPat
+missingPats arity pats = evalState (algorithm initialPatSubs initialIdealMultiPat) 0
    where
      initialPatSubs = zipWith (\p q -> (p, fromJust (unifyMultiPats q p)))
                       pats
                       (repeat initialIdealMultiPat)
      initialIdealMultiPat = map (\n -> GallinaPVarAnn (idealVar n) (GallinaTyCon "Nat"))
                             $ [0 .. (arity - 1)]
-     idealVar n = "'ideal" ++ show n
+     idealVar n = "'q" ++ show n
 
 -- Returns Nothing if the substs only rename variables to variables.
 -- Return Just x where x is a variable mapped to a non-variable.
@@ -106,15 +115,18 @@ hasNonRenaming (Subst s (GallinaPVarAnn _ _)  ) = Nothing
 hasNonRenaming (Compose l r                   ) = hasNonRenaming l
                                                   `mplus` hasNonRenaming r
 
-algorithm :: [(MultiPattern, MultiPatSubst)] -> MultiPattern -> [MultiPattern]
-algorithm []       idealMultiPat = [idealMultiPat]
+algorithm :: [(MultiPattern, MultiPatSubst)] -> MultiPattern -> State Int [MultiPattern]
+algorithm []       idealMultiPat = return [idealMultiPat]
 algorithm a@((p1, s1):_) idealMultiPat =
   trace ("\nactual pats: " ++ show a ++ "\nideal pat: " ++ show idealMultiPat ++ "\ninvariant holds: " ++ show (invariantHolds a idealMultiPat)) $
   case hasNonRenaming s1 of
-    Nothing -> if length a == 1 then [] else error "algorithm: overlap"
-    Just x -> let idealMultiPats = splitVar x idealMultiPat
-              in trace ("split on: " ++ show x ++ " --> " ++ show idealMultiPats) $
-               concatMap (\q -> algorithm (refineMultiPatSubs q a) q) idealMultiPats
+    Nothing -> if length a == 1 then return [] else error "algorithm: overlap"
+    Just x -> do
+      n <- get
+      let idealMultiPats = splitVar n x idealMultiPat
+      modify (+1)
+      trace ("split on: " ++ show x ++ " --> " ++ show idealMultiPats) $
+        fmap concat . mapM (\q -> algorithm (refineMultiPatSubs q a) q) $ idealMultiPats
 
 
 refineMultiPatSubs :: MultiPattern -> [(MultiPattern, MultiPatSubst)] -> [(MultiPattern, MultiPatSubst)]
@@ -128,12 +140,8 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
                                    $ multiPatsSubs
 
 -- splitVar should also get the type to find out how we have to split.
-splitVar :: String -> MultiPattern -> [MultiPattern]
-splitVar var ideal = map (\s -> applyMultiPatSubst s ideal) substs where
+splitVar :: Int -> String -> MultiPattern -> [MultiPattern]
+splitVar n var ideal = map (\s -> applyMultiPatSubst s ideal) substs where
   substs = map (Subst var) pats
-  pats = [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Succ" [GallinaPVarAnn "'p" (GallinaTyCon "Nat")]]
-
-
-test = refineMultiPatSubs [GallinaPAppAnn "Succ" [GallinaPVarAnn "\'p" (GallinaTyCon "Nat")],GallinaPVarAnn "\'ideal1" (GallinaTyCon "Nat")] [([GallinaPAppAnn "Zero" [],GallinaPVarAnn "x" (GallinaTyCon "Nat")],Compose IdSubst (Compose (Subst "\'ideal1" (GallinaPVarAnn "x" (GallinaTyCon "Nat"))) IdSubst))]
-
-test1 = flip invariantHolds [GallinaPAppAnn "Succ" [GallinaPVarAnn "\'p" (GallinaTyCon "Nat")],GallinaPVarAnn "\'ideal1" (GallinaTyCon "Nat")] [([GallinaPAppAnn "Zero" [],GallinaPVarAnn "x" (GallinaTyCon "Nat")],Compose IdSubst (Compose (Subst "\'ideal1" (GallinaPVarAnn "x" (GallinaTyCon "Nat"))) IdSubst))]
+  pats = [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Succ" [GallinaPVarAnn varName (GallinaTyCon "Nat")]]
+  varName = "'p" ++ show n
