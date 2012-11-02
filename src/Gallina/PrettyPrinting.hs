@@ -152,17 +152,26 @@ instance Pp GallinaType where
                                                             ]
 
 instance Pp GallinaTerm where
-  ppPrec _ (GallinaVar s     ) = text s
-  ppPrec p (GallinaApp l r   ) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
-  ppPrec p (GallinaLam v e   ) = parensIf (p > 1) $ text "fun"
-                                 <+> hsep (map text v)
-                                 <+> text "=>"
-                                 <+> nest 2 (pp e)
-  ppPrec _ (GallinaCase e ms ) = text "match" <+> commas (map pp e) <+> text "with"
-                                 $+$ nest 2 (vcat (map pp ms))
-                                 $+$ text "end"
-  ppPrec _ (GallinaLet ds e  ) = foldr (\x y -> text "let" <+> pp x $+$ text "in" <+> y) (pp e) ds
-  ppPrec _ (GallinaIf c t f  ) = sep [ text "if", pp c
-                                     , text "then", pp t
-                                     , text "else", pp f
-                                     ]
+  ppPrec _ (GallinaVar s        ) = text s
+  ppPrec p (GallinaApp l r      ) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
+  ppPrec p (GallinaLam v e      ) = parensIf (p > 1) $ text "fun"
+                                    <+> hsep (map text v)
+                                    <+> text "=>"
+                                    <+> nest 2 (pp e)
+  ppPrec _ (GallinaCase e ms    ) = text "match" <+> commas (map pp e) <+> text "with"
+                                    $+$ nest 2 (vcat (map pp ms))
+                                    $+$ text "end"
+  ppPrec _ (GallinaDepCase e r m) = hsep
+                                    [ text "match"
+                                    , commas (map (\(t,v) -> pp t <+> text "as" <+> text v) e)
+                                    , text "return"
+                                    , pp r
+                                    , text "with"
+                                    ]
+                                    $+$ nest 2 (vcat (map pp m))
+                                    $+$ text "end"
+  ppPrec _ (GallinaLet ds e     ) = foldr (\x y -> text "let" <+> pp x $+$ text "in" <+> y) (pp e) ds
+  ppPrec _ (GallinaIf c t f     ) = sep [ text "if", pp c
+                                        , text "then", pp t
+                                        , text "else", pp f
+                                        ]

@@ -98,6 +98,7 @@ data GallinaTerm =
   | GallinaApp GallinaTerm GallinaTerm
   | GallinaLam [String] GallinaTerm
   | GallinaCase [GallinaTerm] [GallinaMatch]
+  | GallinaDepCase [(GallinaTerm, String)] GallinaType [GallinaMatch]
   | GallinaLet [GallinaLetDefinition] GallinaTerm
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   deriving Show
@@ -117,7 +118,7 @@ ftv (GallinaTyVar str    ) = return str
 ftv (GallinaTyCon _      ) = []
 ftv (GallinaTySet        ) = []
 
--- Replace the GallinaTy constructor by (:).
+-- Replace the GallinaTyFun constructor by (:).
 flatTy :: GallinaType -> [GallinaType]
 flatTy (GallinaTyForall _ ty ) = flatTy ty
 flatTy (GallinaTyFun l r     ) = l : flatTy r
