@@ -1,5 +1,7 @@
 \documentclass[a4paper,10pt]{article}
 
+%include polycode.fmt
+
 \usepackage[utf8x]{inputenc}
 \usepackage[parfill]{parskip}
 \usepackage{amsmath,amsthm,amssymb,stmaryrd}
@@ -51,5 +53,58 @@ probably be outside the scope of this project:
 \item GADTs other extensions to Haskell's type system
 \item do-notation and list comprehensions
 \end{itemize}
+
+\section{Example}
+
+\begin{code}
+{-"\text{\{-\# LANGUAGE NoImplicitPrelude \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_Hs2Gallina quicksort \#-\}}"-}
+
+module Quicksort where
+
+data Nat =
+  Zero
+  | Succ Nat
+
+data List a =
+  Nil
+  | Cons a (List a)
+
+data Bool =
+  True
+  | False
+
+filter :: (a -> Bool) -> List a -> List a
+filter p Nil          =  Nil
+filter p (Cons x xs)  =  if p x
+                         then Cons x (filter p xs)
+                         else filter p xs
+
+lt :: Nat -> Nat -> Bool
+lt Zero      Zero      = False
+lt Zero      (Succ n)  = True
+lt (Succ n)  Zero      = False
+lt (Succ n)  (Succ m)  = lt n m
+
+lnot :: Bool -> Bool
+lnot True  = False
+lnot False = True
+
+ge :: Nat -> Nat -> Bool
+ge a b = lnot (lt a b)
+
+flip :: (a -> b -> c) -> b -> a -> c
+flip f b a = f a b
+
+append :: List a -> List a -> List a
+append Nil          ys = ys
+append (Cons x xs)  ys = Cons x (append xs ys)
+
+quicksort :: List Nat -> List Nat
+quicksort Nil          = Nil
+quicksort (Cons x xs)  = append
+                         (quicksort (filter ((flip lt) x) xs))
+                         (quicksort (filter ((flip ge) x) xs))
+\end{code}
 
 \end{document}
