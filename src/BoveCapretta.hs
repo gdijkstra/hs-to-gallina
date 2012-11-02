@@ -17,25 +17,36 @@ import           Gallina.Syntax
 applyBoveCapretta ::  Vernacular -> Set String -> Vernacular
 applyBoveCapretta v funs = trace (show funs) $ v { moduleDefinitions = newDefinitions }
   where
-    specsAssocs = constrSpecsAssocs v
-    newDefinitions = concatMap transform (moduleDefinitions v)
-    transform d@(GallinaFixpoint [Left b]) = if (funName b) `S.member` funs
-                                      then [extractPredicate specsAssocs b, d]
-                                      else [d]
-    transform d = [d]
+    specs = constrSpecsAssocs v
+    newDefinitions = concatMap (tryApplyBC specs funs) (moduleDefinitions v)
+
+tryApplyBC :: Specifications -> Set String -> GallinaDefinition -> [GallinaDefinition]
+tryApplyBC specs funs def = case def of
+  (GallinaFixpoint [Left b]) -> apply def b (\x -> GallinaFixpoint [Left x])
+  (GallinaFunction b       ) -> apply def b GallinaFunction
+  _                          -> [def]
+  where
+    apply d b f = if (funName b) `S.member` funs
+                  then [extractPredicate specs b, f (transformFunction specs b)]
+                  else [d]
 
 data Specification = Spec [GallinaType] GallinaType
                    deriving Show
 type Specifications = Map String Specification
+-- Map type constructor names to names of their data constructors.
+type TypeConstructors = Map String [String]
+
+tyConstrAssocs :: Vernacular -> TypeConstructors
+tyConstrAssocs = M.fromList . map toTyConstrAssoc . concat
+                 $ [is | (GallinaInductive is) <- moduleDefinitions v]
+  where
+    toTyConstrAssoc :: GallinaInductiveBody -> (String, [String])
+    toTyConstrASsoc i = (inductiveName i, map constrName (inductiveConstrs i))
 
 constrSpecsAssocs :: Vernacular -> Specifications
-constrSpecsAssocs = M.fromList . concatMap (map toSpecAssoc . inductiveConstrs)
-                    . filterInd . moduleDefinitions
+constrSpecsAssocs v = M.fromList . concatMap (map toSpecAssoc . inductiveConstrs) . concat
+                    $ [is | (GallinaInductive is) <- moduleDefinitions v]
   where
-    filterInd :: [GallinaDefinition] -> [GallinaInductiveBody]
-    filterInd = concatMap f
-      where f (GallinaInductive is) = is
-            f _ = []
     toSpecAssoc :: GallinaConstructor -> (String, Specification)
     toSpecAssoc c = (constrName c, constrSpec c)
     constrSpec :: GallinaConstructor -> Specification
@@ -57,6 +68,12 @@ funSpec fun = Spec args res
 -- We need to generate a constructor for every equation of our
 -- function.
 
+extractMatches :: GallinaFunctionBody -> [GallinaMatch]
+extractMatches fun = case funBody fun of
+  (GallinaCase _ ms) -> ms
+  _ -> error "extractPredicate: funBody is malformed."
+
+
 extractPredicate :: Specifications -> GallinaFunctionBody -> GallinaDefinition
 extractPredicate constrSpecAssocs fun = GallinaInductive . return $
   GallinaInductiveBody { inductiveName = predicateName fun
@@ -65,9 +82,7 @@ extractPredicate constrSpecAssocs fun = GallinaInductive . return $
                        , inductiveConstrs = constrs
                        }
   where
-    matches = case funBody fun of
-      (GallinaCase _ ms) -> ms
-      _ -> error "extractPredicate: funBody is malformed."
+    matches = extractMatches fun
     constrs = map (uncurry (extractConstructor specs fun)) . zip matches $ [0..]
     args = argsTy (funArity fun) funtype
     errorMsg = "extractPredicate: " ++ missingTypeMsg fun
@@ -113,6 +128,7 @@ extractContext specs funspec pats =
 data GallinaPatAnnotated =
   GallinaPVarAnn String GallinaType
   | GallinaPAppAnn String [GallinaPatAnnotated]
+    deriving Show
 
 annotatedPatsToContext :: [GallinaPatAnnotated] -> Context
 annotatedPatsToContext = concatMap f
@@ -134,28 +150,28 @@ annotatePats specs (Spec args _) pats = zipWith ann pats args
 substituteSpec :: Specification -> GallinaType -> Specification
 substituteSpec (Spec args res) ty = Spec (map subst args) (subst res)
   where
-    subst = unify res ty
+    subst = unifyTypes res ty
 
-type Subst = GallinaType -> GallinaType
+type TySubst = GallinaType -> GallinaType
 
-mkSubst :: String -> GallinaType -> Subst
-mkSubst _ _  (GallinaTyForall _ _ ) = error "mkSubst: tyforall not allowed."
-mkSubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkSubst a ty l) (mkSubst a ty r)
-mkSubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkSubst a ty l) (mkSubst a ty r)
-mkSubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
-mkSubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
-mkSubst _ _  GallinaTySet           = GallinaTySet
-mkSubst _ _  (GallinaTyPi _ _ _   ) = error "mkSubst: typi not allowed."
+mkTySubst :: String -> GallinaType -> TySubst
+mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: tyforall not allowed."
+mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySubst a ty r)
+mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
+mkTySubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
+mkTySubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
+mkTySubst _ _  GallinaTySet           = GallinaTySet
+mkTySubst _ _  (GallinaTyPi _ _ _   ) = error "mkTySubst: typi not allowed."
 
 -- left type should be more general than right type.
-unify :: GallinaType -> GallinaType -> Subst
-unify (GallinaTyApp p q) (GallinaTyApp r s) = unify p r . unify q s
-unify (GallinaTyCon s1 ) (GallinaTyCon s2 ) = if s1 /= s2
-                                              then error "mkSubst: impossible happened"
+unifyTypes :: GallinaType -> GallinaType -> TySubst
+unifyTypes (GallinaTyApp p q) (GallinaTyApp r s) = unifyTypes p r . unifyTypes q s
+unifyTypes (GallinaTyCon s1 ) (GallinaTyCon s2 ) = if s1 /= s2
+                                              then error "unifyTypes: impossible happened"
                                               else id
-unify (GallinaTyVar a)   r                  = mkSubst a r
-unify l                  r                  =
-  error $ "mkSubst: unsupported: " ++ show l ++ " ~> " ++ show r
+unifyTypes (GallinaTyVar a)   r                  = mkTySubst a r
+unifyTypes l                  r                  =
+  error $ "unifyTypes: unsupported: " ++ show l ++ " ~> " ++ show r
 
 -- Collection of recursive calls.
 collectRecursiveCalls :: GallinaFunctionBody -> GallinaMatch -> [GallinaType]
@@ -202,3 +218,110 @@ patternToType (GallinaPApp s ps ) = foldl GallinaTyApp (GallinaTyCon s)
                                     . map patternToType $ ps
 patternToType GallinaPWildCard    = error "patternToType: wildcards are not supported"
 
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+
+transformFunction :: Specifications -> GallinaFunctionBody -> GallinaFunctionBody
+transformFunction specs fun = trace (show "meh") $ fun
+
+type MultiPattern = [GallinaPatAnnotated]
+
+missingPats :: Specification -> GallinaFunctionBody -> [MultiPattern]
+missingPats specs fun = evalState (algorithm initialPatSubs initialIdealMultiPat) 0
+   where
+     arity = funArity fun
+     pats = map (annotatePats specs (funSpec fun)) (fun
+     initialPatSubs = zipWith (\p q -> (p, fromJust (unifyMultiPats q p)))
+                      pats
+                      (repeat initialIdealMultiPat)
+     initialIdealMultiPat = map (\n -> GallinaPVarAnn (idealVar n) (GallinaTyCon "Nat"))
+                            $ [0 .. (arity - 1)]
+     idealVar n = "'q" ++ show n
+
+missingPats :: Specifications -> GallinaFunctionBody -> [MultiPattern]
+missingPats specs fun = algorithm initialMultiPatsSubs initialIdealMultiPat
+  where
+    multipats = case funBody fun of
+      (GallinaCase _ ms) -> map (toMultiPattern . matchPats) ms
+      _ -> error "missingPats: funBody is malformed."
+    toMultiPattern = annotatePats specs (funSpec fun)
+    initialMultiPatsSubs = undefined
+    initialIdealMultiPat = undefined
+    idealVar = "'ideal"
+
+data MultiPatSubst =
+  Compose MultiPatSubst MultiPatSubst
+  | Subst String GallinaType GallinaPatAnnotated
+  | IdSubst
+    deriving Show
+
+-- We assume that length ps0 == length ps1, i.e. no malformed pats.
+unifyMultiPats :: MultiPattern -> MultiPattern -> Maybe MultiPatSubst
+unifyMultiPats l r = fmap (foldr Compose IdSubst)
+                     $ sequence
+                     $ zipWith unifyPatAnn l r
+
+-- We assume that the patterns are linear, i.e. every variable in the
+-- multipattern occurs exactly once.
+unifyPatAnn :: GallinaPatAnnotated -> GallinaPatAnnotated -> Maybe MultiPatSubst
+unifyPatAnn (GallinaPVarAnn v t   ) p = Just $ Subst v t p
+unifyPatAnn (GallinaPAppAnn _ _   ) (GallinaPVarAnn _ _) = Nothing
+unifyPatAnn (GallinaPAppAnn c0 ps0) (GallinaPAppAnn c1 ps1)
+  | c0 /= c1 = Nothing
+  | otherwise = do
+    substs <- sequence . map (uncurry unifyPatAnn) $ zip ps0 ps1
+    return . foldr Compose IdSubst $ substs
+
+applyMultiPatSubst :: MultiPatSubst -> MultiPattern -> MultiPattern
+applyMultiPatSubst = map . applyPatSubst
+
+applyPatSubst :: MultiPatSubst -> GallinaPatAnnotated -> GallinaPatAnnotated
+applyPatSubst IdSubst = id
+applyPatSubst (Compose l r) = applyPatSubst l . applyPatSubst r
+applyPatSubst (Subst var _ pat) = applySubst var pat
+  where
+    applySubst v0 pat0 pat1@(GallinaPVarAnn v1 _  ) = if v0 == v1 then pat0 else pat1
+    applySubst v0 pat0 (GallinaPAppAnn constr pats) = GallinaPAppAnn constr
+                                                      . map (applySubst v0 pat0)
+                                                      $ pats
+
+-- Returns Nothing if the substs only rename variables to variables.
+-- Return Just x where x is a variable mapped to a non-variable.
+hasNonRenaming :: MultiPatSubst -> Maybe (String, Gallina)
+hasNonRenaming IdSubst                          = Nothing
+hasNonRenaming (Subst s t p@(GallinaPAppAnn _ _)) = Just $ (trace ("found: " ++ show (s,t))) (s, t)
+hasNonRenaming (Subst s _ (GallinaPVarAnn _ _)  ) = Nothing
+hasNonRenaming (Compose l r                   ) = hasNonRenaming l
+                                                  `mplus` hasNonRenaming r
+
+algorithm :: Specifications -> [(MultiPattern, MultiPatSubst)] -> MultiPattern -> State Int [MultiPattern]
+algorithm []       idealMultiPat = return [idealMultiPat]
+algorithm a@((p1, s1):_) idealMultiPat =
+  trace ("\nactual pats: " ++ show a ++ "\nideal pat: " ++ show idealMultiPat ++ "\ninvariant holds: " ++ show (invariantHolds a idealMultiPat)) $
+  case hasNonRenaming s1 of
+    Nothing -> if length a == 1 then return [] else error "algorithm: overlap"
+    Just (x, ty) -> do
+      n <- get
+      let idealMultiPats = splitVar specs ty n x idealMultiPat
+      modify (+1)
+      trace ("split on: " ++ show x ++ " --> " ++ show idealMultiPats) $
+        fmap concat . mapM (\q -> algorithm (refineMultiPatSubs q a) q) $ idealMultiPats
+
+
+refineMultiPatSubs :: MultiPattern -> [(MultiPattern, MultiPatSubst)] -> [(MultiPattern, MultiPatSubst)]
+refineMultiPatSubs q = mapMaybe (\(multipat, substs) -> fmap (\s -> (multipat, s)) unifyMultiPats q multipat)
+
+invariantHolds :: [(MultiPattern, MultiPatSubst)] -> MultiPattern -> Bool
+invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
+                                   . map (\(a,s) -> (a, applyMultiPatSubst s idealMultiPat))
+                                   $ multiPatsSubs
+
+-- splitVar should also get the type to find out how we have to split.
+splitVar :: Specifications -> GallinaType -> Int -> String -> MultiPattern -> [MultiPattern]
+splitVar specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) substs where
+  substs = map (Subst var ty) pats
+  -- pats = [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Succ" [GallinaPVarAnn varName (GallinaTyCon "Nat")]]
+  pats = undefined -- look up ty  
+  varName = "'p" ++ show n

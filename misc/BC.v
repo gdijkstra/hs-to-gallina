@@ -55,15 +55,23 @@ Proof.
   admit.
 Defined.
 
-Fixpoint logIrrelevant2 (x0 : Nat) (h : log_accIrrelevant x0) : Nat :=
-  match x0 as y return (match y with
-                        | Zero => unit
-                        | Succ Zero => Nat
-                        | Succ (Succ p) => Nat
-                        end) with
-    | Zero => tt
-    | Succ Zero => Zero
-    | Succ (Succ p) => Succ (logIrrelevant2 (Succ (div2 p)) (log_domain_inv2 x0 p h))
+(* Fixpoint logIrrelevant2 (x0 : Nat) (h : log_accIrrelevant x0) : Nat := *)
+(*   match x0 as y return (match y with *)
+(*                         | Zero => unit *)
+(*                         | Succ Zero => Nat *)
+(*                         | Succ (Succ p) => Nat *)
+(*                         end) with *)
+(*     | Zero => tt *)
+(*     | Succ Zero => Zero *)
+(*     | Succ (Succ p) => Succ (logIrrelevant2 (Succ (div2 p)) (log_domain_inv2 x0 p h)) *)
+(*   end. *)
+
+
+Function test (x0 x1 : Nat) : Nat :=
+  match x0, x1 with
+      | Zero, _ => Zero
+      | _, Zero => Succ Zero
+      | Succ _, Succ _ => Succ Zero
   end.
 
 
