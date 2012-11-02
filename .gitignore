@@ -9,3 +9,5 @@
 *.hcr
 dist/
 src/AG.hs
+/misc/Test.hs
+/misc/Occurs.hs
