@@ -16,6 +16,5 @@ executable HsToGallina
                  , containers
                  , pretty
                  , filepath
-                 , ghc
-                 , ghc-paths
+                 , mtl
   hs-source-dirs: src

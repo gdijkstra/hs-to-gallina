@@ -8,27 +8,27 @@ data Vernacular =
   { moduleName        :: String
   , moduleDefinitions :: [GallinaDefinition]
   }
-  deriving Show
+  deriving (Show, Eq)
 
 type FunOrPatBody = Either GallinaFunctionBody GallinaPatBindingBody
 
 data GallinaUngroupedDefinition =
   GallinaUngroupedInd GallinaInductiveBody
   | GallinaUngroupedFunOrPat FunOrPatBody
-  deriving Show
+  deriving (Show, Eq)
 
 data GallinaDefinition =
   GallinaInductive [GallinaInductiveBody]
   | GallinaFunction GallinaFunctionBody
   | GallinaPatBinding GallinaPatBindingBody
   | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody]
-  deriving Show
+  deriving (Show, Eq)
 
 data GallinaLetDefinition =
   GallinaLetFunction GallinaFunctionBody
   | GallinaLetPatBinding GallinaPatBindingBody
   | GallinaLetFixpoint (Either GallinaFunctionBody GallinaPatBindingBody)
-  deriving Show
+  deriving (Show, Eq)
 
 data GallinaInductiveBody =
   GallinaInductiveBody
@@ -37,7 +37,7 @@ data GallinaInductiveBody =
   , inductiveType    :: GallinaType
   , inductiveConstrs :: [GallinaConstructor]
   }
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaConstructor =
@@ -45,7 +45,7 @@ data GallinaConstructor =
   { constrName :: String
   , constrType :: GallinaType
   }
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaFunctionBody =
@@ -55,7 +55,7 @@ data GallinaFunctionBody =
   , funType  :: Maybe GallinaType
   , funBody  :: GallinaTerm
   }
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaPatBindingBody =
@@ -64,7 +64,7 @@ data GallinaPatBindingBody =
   , patType :: Maybe GallinaType
   , patBody :: GallinaTerm
   }
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaMatch =
@@ -72,14 +72,14 @@ data GallinaMatch =
   { matchPats :: [GallinaPat]
   , matchTerm :: GallinaTerm
   }
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaPat =
   GallinaPVar String
   | GallinaPApp String [GallinaPat]
   | GallinaPWildCard
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaType =
@@ -90,7 +90,7 @@ data GallinaType =
   | GallinaTyCon String
   | GallinaTySet
   | GallinaTyPi String GallinaType GallinaType
-  deriving Show
+  deriving (Show, Eq)
 
 
 data GallinaTerm =
@@ -101,7 +101,7 @@ data GallinaTerm =
   | GallinaDepCase [(GallinaTerm, String)] GallinaType [GallinaMatch]
   | GallinaLet [GallinaLetDefinition] GallinaTerm
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
-  deriving Show
+  deriving (Show, Eq)
 
 -- Utility functions on types.
 generalise :: GallinaType -> GallinaType
