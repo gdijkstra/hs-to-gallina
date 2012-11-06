@@ -17,10 +17,13 @@ import           Text.PrettyPrint
 
 -- TODO: remove this, for debugging only
 instance Pp MultiPattern where
-  pp = hsep . map (pp . removeAnnotations)
-    where
-      removeAnnotations (GallinaPVarAnn var _ ) = GallinaPVar var
-      removeAnnotations (GallinaPAppAnn s args) = GallinaPApp s (map removeAnnotations args)
+  pp = hsep . map pp . removeAnnotations
+
+removeAnnotations :: MultiPattern -> [GallinaPat]
+removeAnnotations = map removeAnnotations'
+  where
+    removeAnnotations' (GallinaPVarAnn var _ ) = GallinaPVar var
+    removeAnnotations' (GallinaPAppAnn s args) = GallinaPApp s (map removeAnnotations' args)
 
 -- We won't treat mutually recursive functions and don't care about
 -- composition. If we want to use a function that has been defined
@@ -85,7 +88,6 @@ extractMatches :: GallinaFunctionBody -> [GallinaMatch]
 extractMatches fun = case funBody fun of
   (GallinaCase _ ms) -> ms
   _ -> error "extractPredicate: funBody is malformed."
-
 
 extractPredicate :: Specifications -> GallinaFunctionBody -> GallinaDefinition
 extractPredicate constrSpecAssocs fun = GallinaInductive . return $
@@ -168,12 +170,13 @@ substituteSpec (Spec args res) ty = Spec (map subst args) (subst res)
 type TySubst = GallinaType -> GallinaType
 
 mkTySubst :: String -> GallinaType -> TySubst
-mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: tyforall not allowed."
 mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
 mkTySubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
 mkTySubst _ _  GallinaTySet           = GallinaTySet
+mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: tyforall not allowed."
+mkTySubst _ _  (GallinaTyEq _ _     ) = error "mkTySubst: type equality not allowed."
 mkTySubst _ _  (GallinaTyPi _ _ _   ) = error "mkTySubst: typi not allowed."
 
 -- left type should be more general than right type.
@@ -255,13 +258,34 @@ addPredArgument fun = fun { funType = newTy, funArity = newArity }
 addMissingPatterns :: TypeConstructors -> Specifications -> GallinaFunctionBody -> GallinaFunctionBody
 addMissingPatterns tycons specs fun = fun { funBody = newBody }
   where
-    missingMatches = undefined
-    returnTy = undefined
+    arity = funArity fun
+    (_, resultTy) = argsResTy arity (fromJust $ funType fun)
+    name = funName fun
+    missingMatches = mkMissingMatches name resultTy (missingPats tycons specs fun)
+    returnTy = foldl1 GallinaTyFun
+               $ map (\n -> GallinaTyEq (GallinaTyVar ('x':show n)) (GallinaTyVar ("_y" ++ show n))) [0 .. arity - 1]
+               ++ [resultTy]
     newBody = case funBody fun of
-      GallinaCase ts ms -> GallinaApp
-                           (GallinaDepCase (zipWith (\term n -> (term, "'y" ++ show n)) ts ([0..] :: [Int])) returnTy (ms ++ missingMatches))
-                           undefined
+      GallinaCase ts ms -> foldl1 GallinaApp (
+                           (GallinaDepCase (zipWith (\term n -> (term, "_y" ++ show n)) ts ([0..] :: [Int]))
+                            returnTy
+                            (adjustExistingMatches fun ++ missingMatches))
+                           : map (\n -> GallinaApp (GallinaVar "refl_equal") (GallinaVar ('x':show n))) [0 .. arity])
       _ -> error "addMissingPatterns: malformed function body"
+
+
+mkMissingMatches :: String -> GallinaType -> [MultiPattern] -> [GallinaMatch]
+mkMissingMatches name resultTy ms = zipWith (\mp n -> GallinaMatch (removeAnnotations mp) (term n)) ms [0..]
+  where
+    term n  = foldl1 GallinaApp [GallinaVar "False_rec", GallinaTyTerm resultTy, GallinaVar (nonThm n)]
+    nonThm n = name ++ "_acc_non_" ++ show n
+
+adjustExistingMatches :: GallinaFunctionBody -> [GallinaMatch]
+adjustExistingMatches fun = zipWith (\m n -> m { matchTerm = GallinaLam ["_h"] (manipulateTerm n name (matchTerm m)) }) ms [0 ..]
+  where
+    ms = extractMatches fun
+    name = funName fun
+    --context = undefined
 
 -- Missing patterns stuff.
 type MultiPattern = [GallinaPatAnnotated]
@@ -275,7 +299,7 @@ missingPats tycons specs fun = evalState (algorithm tycons specs initialPatSubs 
                       (repeat (initialIdealMultiPat (funSpec fun)))
 
 initialIdealMultiPat :: Specification -> MultiPattern
-initialIdealMultiPat (Spec args _) = zipWith (\ty n -> GallinaPVarAnn ("'q" ++ show n) ty) args ([0..] :: [Int])
+initialIdealMultiPat (Spec args _) = zipWith (\ty n -> GallinaPVarAnn ("_q" ++ show n) ty) args ([0..] :: [Int])
 
 data MultiPatSubst =
   Compose MultiPatSubst MultiPatSubst
@@ -349,6 +373,7 @@ getTypeConstr (GallinaTyFun _ _    ) = error "getTypeConstr: function types not 
 getTypeConstr (GallinaTyVar _      ) = error "getTypeConstr: type var not supported."
 getTypeConstr GallinaTySet           = error "getTypeConstr: set type not supported."
 getTypeConstr (GallinaTyPi _ _ _   ) = error "getTypeConstr: pi types not supported."
+getTypeConstr (GallinaTyEq _ _     ) = error "getTypeConstr: type equality"
 
 maybeTuple :: (a, Maybe b) -> Maybe (a, b)
 maybeTuple (_, Nothing) = Nothing
@@ -358,7 +383,6 @@ maybeTuple (a, Just b ) = return (a, b)
 splitVar :: TypeConstructors -> Specifications -> GallinaType -> Int -> String -> MultiPattern -> [MultiPattern]
 splitVar tycons specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) substs where
   substs = map (Subst var ty) pats
-  -- pats = [GallinaPAppAnn "Zero" [], GallinaPAppAnn "Succ" [GallinaPVarAnn varName (GallinaTyCon "Nat")]]
   pats = fromJust $ do
     constrNames <- M.lookup (getTypeConstr ty) tycons
     constrSpecs <- mapM (\v -> maybeTuple (v, M.lookup v specs)) constrNames
@@ -367,4 +391,34 @@ splitVar tycons specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) su
 
   mkPat c (Spec args _) = GallinaPAppAnn c $ zipWith (\t m -> GallinaPVarAnn ("'p" ++ show n ++ "x" ++ show m) t) args ([0..] :: [Int])
 
---
+-- Manipulate terms
+
+manipulateTerm :: Int -> String -> GallinaTerm -> GallinaTerm
+manipulateTerm m recFunName term = let (t',_,_) = count' 0 term True
+                     in t'
+  where
+    inversionThm n = recFunName ++ "_acc_inv_" ++ show m ++ "_" ++ show n
+    count' :: Int -> GallinaTerm -> Bool -> (GallinaTerm, Int, Bool)
+    count' n t@(GallinaVar str) isRight
+      | isRight && recFunName == str = ( GallinaApp (GallinaVar (str ++ show n)) (GallinaVar (inversionThm n))
+                                     , n + 1
+                                     , True
+                                     )
+      | recFunName == str           = ( GallinaApp (GallinaVar (str ++ show n)) (GallinaVar (inversionThm n))
+                                     , n + 1
+                                     , True
+                                     )
+      | otherwise                  = (t,n,False)
+    count' n (GallinaApp l r) isRight
+      | isRight && b                = ( (GallinaApp (GallinaApp l' r') (GallinaVar (inversionThm n)))
+                                     , n''
+                                     , b
+                                     )
+      | otherwise                  = (GallinaApp l' r'
+                                     , n''
+                                     , b
+                                     )
+      where
+        (l', n' ,b) = count' n l False
+        (r', n'',_) = count' n' r True
+    count' _ _ _ = error "manipulateTerm: cannot manipulate terms that contain something other than applications or variables."

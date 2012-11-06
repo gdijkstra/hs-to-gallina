@@ -90,6 +90,7 @@ data GallinaType =
   | GallinaTyCon String
   | GallinaTySet
   | GallinaTyPi String GallinaType GallinaType
+  | GallinaTyEq GallinaType GallinaType
   deriving (Show, Eq)
 
 
@@ -101,6 +102,7 @@ data GallinaTerm =
   | GallinaDepCase [(GallinaTerm, String)] GallinaType [GallinaMatch]
   | GallinaLet [GallinaLetDefinition] GallinaTerm
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
+  | GallinaTyTerm GallinaType
   deriving (Show, Eq)
 
 -- Utility functions on types.
@@ -112,6 +114,7 @@ generalise ty = let vars = ftv ty in if not (null vars)
 ftv :: GallinaType -> [String]
 ftv (GallinaTyForall _ _ ) = error "ftv: foralls should not occur here"
 ftv (GallinaTyPi _ _ _   ) = error "ftv: pi types should not occur here"
+ftv (GallinaTyEq _ _     ) = error "ftv: equality types should not occur here"
 ftv (GallinaTyFun l r    ) = union (ftv l) (ftv r)
 ftv (GallinaTyApp l r    ) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str    ) = return str
@@ -127,6 +130,7 @@ flatTy ty@(GallinaTyVar _    ) = [ty]
 flatTy ty@(GallinaTyCon _    ) = [ty]
 flatTy ty@(GallinaTySet      ) = [ty]
 flatTy (GallinaTyPi _ _ _    ) = error "flatTy: pi types should not occur here"
+flatTy (GallinaTyEq _ _      ) = error "flatTy: equality types should not occur here"
 
 -- Inverse of flatTy.
 unflatTy :: [GallinaType] -> Maybe GallinaType

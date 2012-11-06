@@ -150,6 +150,10 @@ instance Pp GallinaType where
                                                             , text ","
                                                             , pp t2
                                                             ]
+  ppPrec p (GallinaTyEq t1 t2   ) = parensIf (p > 0) $ hsep [ pp t1
+                                                            , text "="
+                                                            , pp t2
+                                                            ]
 
 instance Pp GallinaTerm where
   ppPrec _ (GallinaVar s        ) = text s
