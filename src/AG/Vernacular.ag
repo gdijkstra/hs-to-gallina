@@ -31,7 +31,7 @@ ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
 
 typeDeps :: GallinaType -> [String]
 typeDeps (GallinaTyEq _ _        ) = error "typeDeps: eq types should not occur here"
-typeDeps (GallinaTyPi _ _ _      ) = error "typeDeps: pi types should not occur here"
+typeDeps (GallinaTyPi _ _        ) = error "typeDeps: pi types should not occur here"
 typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
 typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r

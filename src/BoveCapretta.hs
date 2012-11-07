@@ -5,6 +5,7 @@ module BoveCapretta where
 
 import           Control.Arrow
 import           Control.Monad.State
+import qualified Data.List              as L
 import           Data.Map               (Map)
 import qualified Data.Map               as M
 import           Data.Maybe
@@ -103,8 +104,11 @@ extractPredicate constrSpecAssocs fun = GallinaInductive . return $
     errorMsg = "extractPredicate: " ++ missingTypeMsg fun
     funtype = fromMaybe (error errorMsg) . funType $ fun
     specs = M.insert (funName fun) (funSpec fun) constrSpecAssocs
-    freevars (GallinaTyForall _ t) = ftv t
-    freevars t = ftv t
+
+
+freevars :: GallinaType -> [String]
+freevars (GallinaTyForall _ t) = ftv t
+freevars t = ftv t
 
 predicateName :: GallinaFunctionBody -> String
 predicateName fun = funName fun ++ "_acc"
@@ -128,7 +132,7 @@ extractType specs fun match = combine context recursiveCalls result
         context = extractContext specs (funSpec fun) (matchPats match)
         recursiveCalls = collectRecursiveCalls fun match
         result = resultType fun (matchPats match)
-        contextToType ctx ty = foldr (\(s, t) -> GallinaTyPi s t) ty ctx
+        contextToType ctx ty = if (not (null ctx)) then GallinaTyPi ctx ty else ty
         callsToType calls ty = fromJust . unflatTy $ calls ++ [ty]
 
 -- For the constructors we need to extract the context from the lhs of
@@ -177,7 +181,7 @@ mkTySubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
 mkTySubst _ _  GallinaTySet           = GallinaTySet
 mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: tyforall not allowed."
 mkTySubst _ _  (GallinaTyEq _ _     ) = error "mkTySubst: type equality not allowed."
-mkTySubst _ _  (GallinaTyPi _ _ _   ) = error "mkTySubst: typi not allowed."
+mkTySubst _ _  (GallinaTyPi _ _   ) = error "mkTySubst: typi not allowed."
 
 -- left type should be more general than right type.
 unifyTypes :: GallinaType -> GallinaType -> TySubst
@@ -240,15 +244,17 @@ extractNonTheorems tycons specs fun  = zipWith mkTheorem multipats ([0 ..] :: [I
   where
     arity = funArity fun
     multipats = missingPats tycons specs fun
-    context multipat = map fst $ extractContext specs (funSpec fun) multipat
-    predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar args
-    args = map (("x" ++) . show) [0 .. arity - 1]
+    params = map (\v -> (v, GallinaTySet)) . foldr L.union [] . map freevars $ argTys
+    context multipat = extractContext specs (funSpec fun) multipat
+    predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar (map fst args)
+    argTys = case funSpec fun of Spec a _ -> a
+    args = zipWith (\n t -> ("x" ++ show n, t)) [0 .. arity - 1] argTys
     ty multipat = foldr GallinaTyFun (GallinaTyVar "Logic.False")
                   $ predArg : zipWith (\p n -> GallinaTyEq (GallinaTyVar ('x':show n)) (patternToType p)) multipat [0 .. arity - 1]
 
     mkTheorem multipat n = GallinaThmDef $ GallinaTheorem
                       { theoremName = funName fun ++ "_acc_non_" ++ show n
-                      , theoremProp = GallinaTyForall (args ++ context (removeAnnotations multipat)) (ty (removeAnnotations multipat))
+                      , theoremProp = GallinaTyPi (params ++ args ++ context (removeAnnotations multipat)) (ty (removeAnnotations multipat))
 
                       , theoremProof = "admit."
                       }
@@ -271,7 +277,9 @@ addPredArgument fun = fun { funType = newTy, funArity = newArity }
   where
     (Spec args res) = funSpec fun
     predicate = foldl1 GallinaTyApp $ (GallinaTyCon (predicateName fun)) : map (\n -> GallinaTyVar ('x':show n)) [0 .. (funArity fun - 1)]
-    newTy = unflatTy (args ++ [predicate, res])
+    newTy = case (funType fun) of
+      (Just (GallinaTyForall vars _)) -> Just $ GallinaTyForall vars (fromJust $ unflatTy (args ++ [predicate, res]))
+      _ -> unflatTy (args ++ [predicate, res])
     newArity = funArity fun + 1
 
 addMissingPatterns :: TypeConstructors -> Specifications -> GallinaFunctionBody -> GallinaFunctionBody
@@ -285,7 +293,7 @@ addMissingPatterns tycons specs fun = fun { funBody = newBody }
                $ map (\n -> GallinaTyEq (GallinaTyVar ('x':show n)) (GallinaTyVar ("_y" ++ show n))) [0 .. arity - 1]
                ++ [resultTy]
     newBody = case funBody fun of
-      GallinaCase ts ms -> foldl1 GallinaApp (
+      GallinaCase ts _ -> foldl1 GallinaApp (
                            (GallinaDepCase (zipWith (\term n -> (term, "_y" ++ show n)) ts ([0..] :: [Int]))
                             returnTy
                             (adjustExistingMatches fun ++ missingMatches))
@@ -397,7 +405,7 @@ getTypeConstr (GallinaTyForall _ _ ) = error "getTypeConstr: foralls not support
 getTypeConstr (GallinaTyFun _ _    ) = error "getTypeConstr: function types not supported."
 getTypeConstr (GallinaTyVar _      ) = error "getTypeConstr: type var not supported."
 getTypeConstr GallinaTySet           = error "getTypeConstr: set type not supported."
-getTypeConstr (GallinaTyPi _ _ _   ) = error "getTypeConstr: pi types not supported."
+getTypeConstr (GallinaTyPi _ _     ) = error "getTypeConstr: pi types not supported."
 getTypeConstr (GallinaTyEq _ _     ) = error "getTypeConstr: type equality"
 
 maybeTuple :: (a, Maybe b) -> Maybe (a, b)

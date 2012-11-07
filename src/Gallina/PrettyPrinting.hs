@@ -144,12 +144,12 @@ instance Pp GallinaType where
   ppPrec _ (GallinaTyVar s      ) = text s
   ppPrec _ (GallinaTyCon s      ) = text s
   ppPrec _ (GallinaTySet        ) = text "Set"
-  ppPrec p (GallinaTyPi s t1 t2 ) = parensIf (p > 0) $ hsep [ text "forall"
-                                                            , text s
-                                                            , text ":"
-                                                            , pp t1
+  ppPrec p (GallinaTyPi st t1   ) = parensIf (p > 0) $ hsep [ text "forall"
+                                                            , hsep
+                                                              . map (\(s,t) -> parens (hsep [text s, text ":", pp t]))
+                                                              $ st
                                                             , text ","
-                                                            , pp t2
+                                                            , pp t1
                                                             ]
   ppPrec p (GallinaTyEq t1 t2   ) = parensIf (p > 0) $ hsep [ pp t1
                                                             , text "="
