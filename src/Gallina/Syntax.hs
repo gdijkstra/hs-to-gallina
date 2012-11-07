@@ -159,9 +159,6 @@ argsResTy arity ty@(GallinaTyFun _ _ ) = ( take arity . flatTy $ ty
     errorMsg = error "argsResTy: unflattening failed: arity too high"
 argsResTy _     _                      = error "argsResTy: not a function type"
 
-argsTy :: Int -> GallinaType -> GallinaType
-argsTy arity ty = fromJust . unflatTy . fst . argsResTy arity $ ty
-
 resTy :: Int -> GallinaType -> GallinaType
 resTy arity ty = snd . argsResTy arity $ ty
 

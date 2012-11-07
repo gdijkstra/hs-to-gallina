@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_Hs2Gallina missing0 recursive #-}
+{-# OPTIONS_Hs2Gallina missing0 missing1 recursive #-}
 
 module MissingCases where
 
@@ -21,6 +21,10 @@ id x = x
 
 missing0 :: List Nat -> Bool
 missing0 (Cons Zero Nil) = True
+
+missing1 :: List Nat -> Bool -> Bool
+missing1 (Cons Zero Nil) True = True
+
 
 -- recursive :: List Nat -> Bool
 -- recursive (Cons Zero Nil ) = True

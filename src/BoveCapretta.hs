@@ -93,13 +93,13 @@ extractPredicate :: Specifications -> GallinaFunctionBody -> GallinaDefinition
 extractPredicate constrSpecAssocs fun = GallinaInductive . return $
   GallinaInductiveBody { inductiveName = predicateName fun
                        , inductiveParams = freevars funtype
-                       , inductiveType = GallinaTyFun args GallinaTySet
+                       , inductiveType = fromJust . unflatTy $ args ++ [GallinaTySet]
                        , inductiveConstrs = constrs
                        }
   where
     matches = extractMatches fun
     constrs = map (uncurry (extractConstructor specs fun)) . zip matches $ [0..]
-    args = argsTy (funArity fun) funtype
+    (args, _) = argsResTy (funArity fun) (fromJust . funType $ fun)
     errorMsg = "extractPredicate: " ++ missingTypeMsg fun
     funtype = fromMaybe (error errorMsg) . funType $ fun
     specs = M.insert (funName fun) (funSpec fun) constrSpecAssocs
@@ -129,7 +129,7 @@ extractType specs fun match = combine context recursiveCalls result
         recursiveCalls = collectRecursiveCalls fun match
         result = resultType fun (matchPats match)
         contextToType ctx ty = foldr (\(s, t) -> GallinaTyPi s t) ty ctx
-        callsToType calls ty = foldr GallinaTyFun ty calls
+        callsToType calls ty = fromJust . unflatTy $ calls ++ [ty]
 
 -- For the constructors we need to extract the context from the lhs of
 -- the equation, i.e. the patterns. We need to know the types of the
@@ -225,8 +225,7 @@ collectArgs t = collectArgs' t True []
 -- the pattern found in the lhs of the equation.
 resultType :: GallinaFunctionBody -> [GallinaPat] -> GallinaType
 resultType _   []   = error "resultType: pats list should never be empty"
-resultType fun pats = GallinaTyApp (GallinaTyCon (predicateName fun))
-                      $ foldr1 GallinaTyApp (map patternToType pats)
+resultType fun pats = foldl1 GallinaTyApp $ GallinaTyCon (predicateName fun) : map patternToType pats
 
 patternToType :: GallinaPat -> GallinaType
 patternToType (GallinaPVar s    ) = GallinaTyVar s
@@ -271,8 +270,7 @@ addPredArgument :: GallinaFunctionBody -> GallinaFunctionBody
 addPredArgument fun = fun { funType = newTy, funArity = newArity }
   where
     (Spec args res) = funSpec fun
-    predicate = GallinaTyApp (GallinaTyCon (predicateName fun))
-                $ foldr1 GallinaTyApp (map (\n -> GallinaTyVar ('x':show n)) [0 .. (funArity fun - 1)])
+    predicate = foldl1 GallinaTyApp $ (GallinaTyCon (predicateName fun)) : map (\n -> GallinaTyVar ('x':show n)) [0 .. (funArity fun - 1)]
     newTy = unflatTy (args ++ [predicate, res])
     newArity = funArity fun + 1
 
@@ -283,7 +281,7 @@ addMissingPatterns tycons specs fun = fun { funBody = newBody }
     (_, resultTy) = argsResTy arity (fromJust $ funType fun)
     name = funName fun
     missingMatches = mkMissingMatches arity name resultTy (missingPats tycons specs fun)
-    returnTy = foldl1 GallinaTyFun
+    returnTy = foldr1 GallinaTyFun
                $ map (\n -> GallinaTyEq (GallinaTyVar ('x':show n)) (GallinaTyVar ("_y" ++ show n))) [0 .. arity - 1]
                ++ [resultTy]
     newBody = case funBody fun of
