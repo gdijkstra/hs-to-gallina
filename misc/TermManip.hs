@@ -17,7 +17,7 @@ ppPrec p (App l r) = parensIf (p > 1) $ ppPrec 0 l ++ " " ++ ppPrec 2 r
 pp :: Term -> String
 pp = ppPrec 0
 
-testTerm = App (App (App (Var "g") (Var "x")) (App (Var "f") (Var "y"))) (App (Var "f") (App (Var "f") (Var "z")))
+testTerm = App (App (App (Var "g") (Var "x")) (App (Var "f") (Var "y"))) (Var "f")
 
 collectArgs :: Term -> Bool -> [Term] -> [(String, [Term])]
 collectArgs (Var s) left args = if left then [(s, reverse args)] else []
@@ -31,11 +31,11 @@ count recFunName t = let (t',_,_) = count' 0 t True
                      in t'
   where
     count' n t@(Var str) isRight
-      | isRight && recFunName == str = ( App (Var (str ++ show n)) (Var ("h" ++ show n))
+      | isRight && recFunName == str = ( (App t (Var ("h" ++ show n)))
                                      , n + 1
                                      , True
                                      )
-      | recFunName == str           = ( App (Var (str ++ show n)) (Var ("h" ++ show n))
+      | recFunName == str           = ( t
                                      , n + 1
                                      , True
                                      )
@@ -59,5 +59,6 @@ count recFunName t = let (t',_,_) = count' 0 t True
 --  inh isRight :: Bool
 --  chn count :: Int
 --  syn bcTerm :: Term
+--  syn recFunInLeftSubTree :: Bool
 
 test = pp testTerm ++ " ~~~> " ++ pp (count "f" testTerm)

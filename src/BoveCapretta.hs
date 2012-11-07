@@ -43,7 +43,7 @@ tryApplyBC tycons specs funs def = case def of
   _                          -> [def]
   where
     apply d b f = if (funName b) `S.member` funs
-                  then [extractPredicate specs b, f (transformFunction tycons specs b)]
+                  then [extractPredicate specs b] ++ extractNonTheorems tycons specs b ++ [f (transformFunction tycons specs b)]
                   else [d]
 
 data Specification = Spec [GallinaType] GallinaType
@@ -234,6 +234,27 @@ patternToType (GallinaPApp s ps ) = foldl GallinaTyApp (GallinaTyCon s)
                                     . map patternToType $ ps
 patternToType GallinaPWildCard    = error "patternToType: wildcards are not supported"
 
+----
+
+extractNonTheorems :: TypeConstructors -> Specifications -> GallinaFunctionBody -> [GallinaDefinition]
+extractNonTheorems tycons specs fun  = zipWith mkTheorem multipats ([0 ..] :: [Int])
+  where
+    arity = funArity fun
+    multipats = missingPats tycons specs fun
+    context multipat = map fst $ extractContext specs (funSpec fun) multipat
+    predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar args
+    args = map (("x" ++) . show) [0 .. arity - 1]
+    ty multipat = foldr GallinaTyFun (GallinaTyVar "Logic.False")
+                  $ predArg : zipWith (\p n -> GallinaTyEq (GallinaTyVar ('x':show n)) (patternToType p)) multipat [0 .. arity - 1]
+
+    mkTheorem multipat n = GallinaThmDef $ GallinaTheorem
+                      { theoremName = funName fun ++ "_acc_non_" ++ show n
+                      , theoremProp = GallinaTyForall (args ++ context (removeAnnotations multipat)) (ty (removeAnnotations multipat))
+
+                      , theoremProof = "admit."
+                      }
+
+
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
@@ -261,7 +282,7 @@ addMissingPatterns tycons specs fun = fun { funBody = newBody }
     arity = funArity fun
     (_, resultTy) = argsResTy arity (fromJust $ funType fun)
     name = funName fun
-    missingMatches = mkMissingMatches name resultTy (missingPats tycons specs fun)
+    missingMatches = mkMissingMatches arity name resultTy (missingPats tycons specs fun)
     returnTy = foldl1 GallinaTyFun
                $ map (\n -> GallinaTyEq (GallinaTyVar ('x':show n)) (GallinaTyVar ("_y" ++ show n))) [0 .. arity - 1]
                ++ [resultTy]
@@ -270,21 +291,27 @@ addMissingPatterns tycons specs fun = fun { funBody = newBody }
                            (GallinaDepCase (zipWith (\term n -> (term, "_y" ++ show n)) ts ([0..] :: [Int]))
                             returnTy
                             (adjustExistingMatches fun ++ missingMatches))
-                           : map (\n -> GallinaApp (GallinaVar "refl_equal") (GallinaVar ('x':show n))) [0 .. arity])
+                           : map (\n -> GallinaApp (GallinaVar "refl_equal") (GallinaVar ('x':show n))) [0 .. arity - 1])
       _ -> error "addMissingPatterns: malformed function body"
 
 
-mkMissingMatches :: String -> GallinaType -> [MultiPattern] -> [GallinaMatch]
-mkMissingMatches name resultTy ms = zipWith (\mp n -> GallinaMatch (removeAnnotations mp) (term n)) ms [0..]
+mkMissingMatches :: Int -> String -> GallinaType -> [MultiPattern] -> [GallinaMatch]
+mkMissingMatches arity name resultTy ms = zipWith (\mp n -> GallinaMatch (removeAnnotations mp) (term n)) ms ([0..] :: [Int])
   where
-    term n  = foldl1 GallinaApp [GallinaVar "False_rec", GallinaTyTerm resultTy, GallinaVar (nonThm n)]
+    term n  = GallinaLam eqArgs $ foldl1 GallinaApp $ [GallinaVar "False_rec", GallinaTyTerm resultTy, foldl1 GallinaApp (GallinaVar (nonThm n) : map GallinaVar args)]
+    eqArgs = map (\n -> "_h" ++ show n) [0 .. arity - 1]
+    args = ('x' : show arity) : eqArgs
     nonThm n = name ++ "_acc_non_" ++ show n
 
 adjustExistingMatches :: GallinaFunctionBody -> [GallinaMatch]
-adjustExistingMatches fun = zipWith (\m n -> m { matchTerm = GallinaLam ["_h"] (manipulateTerm n name (matchTerm m)) }) ms [0 ..]
+adjustExistingMatches fun = zipWith (\m n -> m { matchTerm = GallinaLam (map (\o -> "_h" ++ show o) [0 .. arity - 1])
+                                                             (manipulateTerm n name (matchTerm m)) })
+                            ms
+                            [0 ..]
   where
     ms = extractMatches fun
     name = funName fun
+    arity = funArity fun
     --context = undefined
 
 -- Missing patterns stuff.
@@ -389,7 +416,7 @@ splitVar tycons specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) su
     let actualSpecs = map (second (flip substituteSpec ty)) constrSpecs
     return . map (uncurry mkPat) $ actualSpecs
 
-  mkPat c (Spec args _) = GallinaPAppAnn c $ zipWith (\t m -> GallinaPVarAnn ("'p" ++ show n ++ "x" ++ show m) t) args ([0..] :: [Int])
+  mkPat c (Spec args _) = GallinaPAppAnn c $ zipWith (\t m -> GallinaPVarAnn ("_p" ++ show n ++ "x" ++ show m) t) args ([0..] :: [Int])
 
 -- Manipulate terms
 
@@ -400,11 +427,11 @@ manipulateTerm m recFunName term = let (t',_,_) = count' 0 term True
     inversionThm n = recFunName ++ "_acc_inv_" ++ show m ++ "_" ++ show n
     count' :: Int -> GallinaTerm -> Bool -> (GallinaTerm, Int, Bool)
     count' n t@(GallinaVar str) isRight
-      | isRight && recFunName == str = ( GallinaApp (GallinaVar (str ++ show n)) (GallinaVar (inversionThm n))
+      | isRight && recFunName == str = ( GallinaApp (GallinaVar str) (GallinaVar (inversionThm n))
                                      , n + 1
                                      , True
                                      )
-      | recFunName == str           = ( GallinaApp (GallinaVar (str ++ show n)) (GallinaVar (inversionThm n))
+      | recFunName == str           = ( t
                                      , n + 1
                                      , True
                                      )

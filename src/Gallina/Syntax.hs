@@ -22,6 +22,7 @@ data GallinaDefinition =
   | GallinaFunction GallinaFunctionBody
   | GallinaPatBinding GallinaPatBindingBody
   | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody]
+  | GallinaThmDef GallinaTheorem
   deriving (Show, Eq)
 
 data GallinaLetDefinition =
@@ -103,6 +104,14 @@ data GallinaTerm =
   | GallinaLet [GallinaLetDefinition] GallinaTerm
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   | GallinaTyTerm GallinaType
+  deriving (Show, Eq)
+
+data GallinaTheorem =
+  GallinaTheorem
+  { theoremName  :: String
+  , theoremProp  :: GallinaType
+  , theoremProof :: String
+  }
   deriving (Show, Eq)
 
 -- Utility functions on types.

@@ -43,10 +43,11 @@ instance Pp GallinaUngroupedDefinition where
   pp a = text "Ungrouped" <> pp a
 
 instance Pp GallinaDefinition where
-  pp (GallinaInductive is ) = ppGroupDotted "Inductive" is
-  pp (GallinaFixpoint is  ) = ppGroupDotted "Fixpoint" is
-  pp (GallinaFunction b   ) = ppGroupDotted "Definition" [b]
-  pp (GallinaPatBinding b ) = ppGroupDotted "Definition" [b]
+  pp (GallinaInductive is) = ppGroupDotted "Inductive" is
+  pp (GallinaFixpoint is ) = ppGroupDotted "Fixpoint" is
+  pp (GallinaFunction b  ) = ppGroupDotted "Definition" [b]
+  pp (GallinaPatBinding b) = ppGroupDotted "Definition" [b]
+  pp (GallinaThmDef d    ) = pp d
 
 instance Pp GallinaLetDefinition where
   pp (GallinaLetFixpoint b   ) = ppGroup "fix" [b]
@@ -137,7 +138,7 @@ instance Pp GallinaPat where
   ppPrec _ GallinaPWildCard    = text "_"
 
 instance Pp GallinaType where
-  ppPrec _ (GallinaTyForall _ _ ) = error "ppPrec: foralls should not occur here."
+  ppPrec p (GallinaTyForall s ty) = parensIf (p > 0) $ hsep [text "forall", hsep . map text $ s, text ",", pp ty]
   ppPrec p (GallinaTyFun l r    ) = parensIf (p > 0) $ ppPrec 1 l <+> text "->" <+> pp r
   ppPrec p (GallinaTyApp l r    ) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
   ppPrec _ (GallinaTyVar s      ) = text s
@@ -179,3 +180,14 @@ instance Pp GallinaTerm where
                                         , text "then", pp t
                                         , text "else", pp f
                                         ]
+  ppPrec _ (GallinaTyTerm ty    ) = ppPrec 2 ty
+
+instance Pp GallinaTheorem where
+  ppPrec _ thm = vcat [ hsep [ text "Theorem"
+                             , text (theoremName thm)
+                             , text ":", pp (theoremProp thm)
+                             , text "."
+                             ]
+                      , text (theoremProof thm)
+                      , text "Defined."
+                      ]
