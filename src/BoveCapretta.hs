@@ -1,24 +1,15 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-
 module BoveCapretta where
 
 import           Control.Arrow
 import           Control.Monad.State
-import qualified Data.List              as L
-import           Data.Map               (Map)
-import qualified Data.Map               as M
+import qualified Data.List           as L
+import           Data.Map            (Map)
+import qualified Data.Map            as M
 import           Data.Maybe
-import           Data.Set               (Set)
-import qualified Data.Set               as S
+import           Data.Set            (Set)
+import qualified Data.Set            as S
 import           Debug.Trace
-import           Gallina.PrettyPrinting
 import           Gallina.Syntax
-import           Text.PrettyPrint
-
--- TODO: remove this, for debugging only
-instance Pp MultiPattern where
-  pp = hsep . map pp . removeAnnotations
 
 removeAnnotations :: MultiPattern -> [GallinaPat]
 removeAnnotations = map removeAnnotations'
@@ -44,7 +35,11 @@ tryApplyBC tycons specs funs def = case def of
   _                          -> [def]
   where
     apply d b f = if (funName b) `S.member` funs
-                  then [extractPredicate specs b] ++ extractNonTheorems tycons specs b ++ [f (transformFunction tycons specs b)]
+                  then concat [ [extractPredicate specs b]
+                              , extractNonTheorems tycons specs b
+                              , extractInvTheorems specs b
+                              , [f (transformFunction tycons specs b)]
+                              ]
                   else [d]
 
 data Specification = Spec [GallinaType] GallinaType
@@ -193,7 +188,7 @@ unifyTypes (GallinaTyVar a)   r                  = mkTySubst a r
 unifyTypes l                  r                  =
   error $ "unifyTypes: unsupported: " ++ show l ++ " ~> " ++ show r
 
--- Collection of recursive calls.
+-- Collection of recursive calls, from left to right.
 collectRecursiveCalls :: GallinaFunctionBody -> GallinaMatch -> [GallinaType]
 collectRecursiveCalls fun match = map (callToType . snd)
                                   . filter isRecursive
@@ -266,8 +261,7 @@ extractNonTheorems tycons specs fun  = zipWith mkTheorem multipats ([0 ..] :: [I
 ---------------------------------------------------------------------------------
 
 transformFunction :: TypeConstructors -> Specifications -> GallinaFunctionBody -> GallinaFunctionBody
-transformFunction tycons specs fun = trace ("missing:" ++ show (map pp $ missingPats tycons specs fun))
-                                     $ addPredArgument . addMissingPatterns tycons specs $ fun
+transformFunction tycons specs fun = addPredArgument . addMissingPatterns tycons specs $ fun
 
 
 -- We add the accessability predicate as an extra argument to the
@@ -311,7 +305,7 @@ mkMissingMatches arity name resultTy ms = zipWith (\mp n -> GallinaMatch (remove
 
 adjustExistingMatches :: GallinaFunctionBody -> [GallinaMatch]
 adjustExistingMatches fun = zipWith (\m n -> m { matchTerm = GallinaLam (map (\o -> "_h" ++ show o) [0 .. arity - 1])
-                                                             (manipulateTerm n name (matchTerm m)) })
+                                                             (manipulateTerm arity n name (matchTerm m)) })
                             ms
                             [0 ..]
   where
@@ -426,14 +420,14 @@ splitVar tycons specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) su
 
 -- Manipulate terms
 
-manipulateTerm :: Int -> String -> GallinaTerm -> GallinaTerm
-manipulateTerm m recFunName term = let (t',_,_) = count' 0 term True
+manipulateTerm :: Int -> Int -> String -> GallinaTerm -> GallinaTerm
+manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
                      in t'
   where
-    inversionThm n = recFunName ++ "_acc_inv_" ++ show m ++ "_" ++ show n
+    invThm n = recFunName ++ "_acc_inv_" ++ show m ++ "_" ++ show n
     count' :: Int -> GallinaTerm -> Bool -> (GallinaTerm, Int, Bool)
     count' n t@(GallinaVar str) isRight
-      | isRight && recFunName == str = ( GallinaApp (GallinaVar str) (GallinaVar (inversionThm n))
+      | isRight && recFunName == str = ( GallinaApp (GallinaVar str) (term' n)
                                      , n + 1
                                      , True
                                      )
@@ -443,7 +437,7 @@ manipulateTerm m recFunName term = let (t',_,_) = count' 0 term True
                                      )
       | otherwise                  = (t,n,False)
     count' n (GallinaApp l r) isRight
-      | isRight && b                = ( (GallinaApp (GallinaApp l' r') (GallinaVar (inversionThm n)))
+      | isRight && b                = ( GallinaApp (GallinaApp l' r') (term' n)
                                      , n''
                                      , b
                                      )
@@ -455,3 +449,28 @@ manipulateTerm m recFunName term = let (t',_,_) = count' 0 term True
         (l', n' ,b) = count' n l False
         (r', n'',_) = count' n' r True
     count' _ _ _ = error "manipulateTerm: cannot manipulate terms that contain something other than applications or variables."
+    term' n = foldl1 GallinaApp (GallinaVar (invThm n) : map GallinaVar args)
+    eqArgs = map (\n -> "_h" ++ show n) [0 .. arity - 1]
+    args = ('x' : show arity) : eqArgs
+
+extractInvTheorems :: Specifications -> GallinaFunctionBody -> [GallinaDefinition]
+extractInvTheorems specs fun = concat $ zipWith calls matches ([0 ..] :: [Int])
+  where
+    arity = funArity fun
+    matches = extractMatches fun
+    params = map (\v -> (v, GallinaTySet)) . foldr L.union [] . map freevars $ argTys
+    context multipat = extractContext specs (funSpec fun) multipat
+    predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar (map fst args)
+    argTys = case funSpec fun of Spec a _ -> a
+    args = zipWith (\n t -> ("x" ++ show n, t)) [0 .. arity - 1] argTys
+    ty call multipat = foldr GallinaTyFun call
+                       $ predArg : zipWith (\p n -> GallinaTyEq (GallinaTyVar ('x':show n)) (patternToType p)) multipat [0 .. arity - 1]
+
+    calls match n = zipWith (mkTheorem match n) (collectRecursiveCalls fun match) ([0 ..] :: [Int])
+    mkTheorem match n call m = GallinaThmDef $ GallinaTheorem
+                           { theoremName = funName fun ++ "_acc_inv_" ++ show n ++ "_" ++ show m
+                           , theoremProp = GallinaTyPi (params ++ args ++ context (matchPats match)) (ty call (matchPats match))
+                           , theoremProof = "admit."
+                           }
+
+--collectRecursiveCalls :: GallinaFunctionBody -> GallinaMatch -> [GallinaType]

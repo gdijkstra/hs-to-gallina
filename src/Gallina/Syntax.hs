@@ -23,6 +23,8 @@ data GallinaDefinition =
   | GallinaPatBinding GallinaPatBindingBody
   | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody]
   | GallinaThmDef GallinaTheorem
+  | GallinaSetImplicit
+  | GallinaUnsetImplicit
   deriving (Show, Eq)
 
 data GallinaLetDefinition =

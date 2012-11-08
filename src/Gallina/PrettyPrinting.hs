@@ -24,7 +24,7 @@ ppVernacular :: Vernacular -> String
 ppVernacular = render . pp
 
 ppGroup :: (Pp a) => String -> [a] -> Doc
-ppGroup name is = text name <+> vsep (intersperse (text "with") . map pp $ is)
+ppGroup name is = text name <+> vcat (intersperse (text "with") . map pp $ is)
 
 ppGroupDotted :: (Pp a) => String -> [a] -> Doc
 ppGroupDotted name is = ppGroup name is <> text "."
@@ -32,7 +32,6 @@ ppGroupDotted name is = ppGroup name is <> text "."
 
 instance Pp Vernacular where
   pp a = vsep [text "Module" <+> text (moduleName a) <> text "."
-              , text "Set Implicit Arguments."
               , text "Set Contextual Implicit."
               , vsep (map pp (moduleDefinitions a))
               , text "End" <+> text (moduleName a) <> text "."
@@ -48,6 +47,9 @@ instance Pp GallinaDefinition where
   pp (GallinaFunction b  ) = ppGroupDotted "Definition" [b]
   pp (GallinaPatBinding b) = ppGroupDotted "Definition" [b]
   pp (GallinaThmDef d    ) = pp d
+  pp GallinaSetImplicit    = text "Set Implicit Arguments."
+  pp GallinaUnsetImplicit  = text "Unset Implicit Arguments."
+
 
 instance Pp GallinaLetDefinition where
   pp (GallinaLetFixpoint b   ) = ppGroup "fix" [b]
@@ -60,9 +62,10 @@ instance Pp GallinaInductiveBody where
               , text ":"
               , pp (inductiveType a)
               , text ":="
-                $+$
-                nest 2 (vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a)))
               ]
+         $$
+         vcat (map (\x -> text "|" <+> pp x) (inductiveConstrs a))
+
     where
       params = if not (null pars)
                then hsep [lparen, hsep (map text pars), text ": Set", rparen]
@@ -164,8 +167,8 @@ instance Pp GallinaTerm where
                                     <+> text "=>"
                                     <+> nest 2 (pp e)
   ppPrec _ (GallinaCase e ms    ) = text "match" <+> commas (map pp e) <+> text "with"
-                                    $+$ nest 2 (vcat (map pp ms))
-                                    $+$ text "end"
+                                    $$ nest 2 (vcat (map pp ms))
+                                    $$ text "end"
   ppPrec _ (GallinaDepCase e r m) = hsep
                                     [ text "match"
                                     , commas (map (\(t,v) -> pp t <+> text "as" <+> text v) e)
@@ -173,9 +176,9 @@ instance Pp GallinaTerm where
                                     , pp r
                                     , text "with"
                                     ]
-                                    $+$ nest 2 (vcat (map pp m))
-                                    $+$ text "end"
-  ppPrec _ (GallinaLet ds e     ) = foldr (\x y -> text "let" <+> pp x $+$ text "in" <+> y) (pp e) ds
+                                    $$ nest 2 (vcat (map pp m))
+                                    $$ text "end"
+  ppPrec _ (GallinaLet ds e     ) = foldr (\x y -> text "let" <+> pp x $$ text "in" <+> y) (pp e) ds
   ppPrec _ (GallinaIf c t f     ) = sep [ text "if", pp c
                                         , text "then", pp t
                                         , text "else", pp f

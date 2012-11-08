@@ -29,7 +29,7 @@ hd :: List a -> a
 hd (Cons x _xs) = x
 
 
--- recursive :: List Nat -> Bool
--- recursive (Cons Zero Nil ) = True
--- recursive (Cons _x (Cons _y x)) = id (recursive x)
+recursive :: List Nat -> Bool
+recursive (Cons Zero Nil ) = True
+recursive (Cons _x (Cons _y x)) = id (recursive x)
 
