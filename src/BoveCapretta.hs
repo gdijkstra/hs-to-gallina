@@ -251,7 +251,8 @@ extractNonTheorems tycons specs fun  = zipWith mkTheorem multipats ([0 ..] :: [I
                       { theoremName = funName fun ++ "_acc_non_" ++ show n
                       , theoremProp = GallinaTyPi (params ++ args ++ context (removeAnnotations multipat)) (ty (removeAnnotations multipat))
 
-                      , theoremProof = "admit."
+                      , theoremProof = "intros " ++ unwords (map fst (params ++ args ++ context (removeAnnotations multipat)))
+                                       ++ " H; case H; intros; discriminate."
                       }
 
 
@@ -472,5 +473,3 @@ extractInvTheorems specs fun = concat $ zipWith calls matches ([0 ..] :: [Int])
                            , theoremProp = GallinaTyPi (params ++ args ++ context (matchPats match)) (ty call (matchPats match))
                            , theoremProof = "admit."
                            }
-
---collectRecursiveCalls :: GallinaFunctionBody -> GallinaMatch -> [GallinaType]
