@@ -7,14 +7,14 @@ type DeclDeps =  [(GallinaUngroupedDefinition, String, [String])]
 groupDefinitions :: SCC GallinaUngroupedDefinition -> GallinaDefinition
 groupDefinitions (AcyclicSCC x) = toDef x
   where
-    toDef (GallinaUngroupedInd b              ) = GallinaInductive [b]
-    toDef (GallinaUngroupedFunOrPat (Left b)  ) = GallinaFunction b
+    toDef (GallinaUngroupedInd b              ) = GallinaInductive [b] False
+    toDef (GallinaUngroupedFunOrPat (Left b)  ) = GallinaFunction b 
     toDef (GallinaUngroupedFunOrPat (Right b) ) = GallinaPatBinding b
-groupDefinitions (CyclicSCC is@((GallinaUngroupedInd _):_)) = GallinaInductive (map toInd is)
+groupDefinitions (CyclicSCC is@((GallinaUngroupedInd _):_)) = GallinaInductive (map toInd is) False
   where
     toInd (GallinaUngroupedInd b) = b
     toInd _ = error "groupDefinitions: toInd: argument must be an inductive definition."
-groupDefinitions (CyclicSCC is@((GallinaUngroupedFunOrPat _):_)) = GallinaFixpoint (map toFix is)
+groupDefinitions (CyclicSCC is@((GallinaUngroupedFunOrPat _):_)) = GallinaFixpoint (map toFix is) False
   where
     toFix (GallinaUngroupedFunOrPat b) = b
     toFix _ = error "groupDefinitions: toFix: argument must be a function or pattern binding."
@@ -81,9 +81,11 @@ attr Module
                  
 sem Module                 
   | Module
-     lhs.result = ( mkVernacular @types @constrMap @modulename.name @decls.declsDeps
-                  , @bcFunctions
-                  )
+     lhs.result = Result
+                  { resVernacular = mkVernacular @types @constrMap @modulename.name @decls.declsDeps
+                  , bcDefinitions = @bcFunctions
+                  , coDefinitions = @coDefs
+                  }
      loc.constrMap = M.fromList @decls.constrAssocs
      loc.dependencies = @decls.names `difference` (associate @constrMap @decls.dependencies)
 

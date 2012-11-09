@@ -42,8 +42,10 @@ instance Pp GallinaUngroupedDefinition where
   pp a = text "Ungrouped" <> pp a
 
 instance Pp GallinaDefinition where
-  pp (GallinaInductive is) = ppGroupDotted "Inductive" is
-  pp (GallinaFixpoint is ) = ppGroupDotted "Fixpoint" is
+  pp (GallinaInductive is False) = ppGroupDotted "Inductive" is
+  pp (GallinaInductive is True) = ppGroupDotted "CoInductive" is
+  pp (GallinaFixpoint is False) = ppGroupDotted "Fixpoint" is
+  pp (GallinaFixpoint is True) = ppGroupDotted "CoFixpoint" is
   pp (GallinaFunction b  ) = ppGroupDotted "Definition" [b]
   pp (GallinaPatBinding b) = ppGroupDotted "Definition" [b]
   pp (GallinaThmDef d    ) = pp d

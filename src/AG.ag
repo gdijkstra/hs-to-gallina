@@ -25,7 +25,12 @@ include "AG/Util.ag"
 include "AG/Pragmas.ag"
 
 {
-type Result = (Vernacular, Set String)
+data Result = 
+  Result
+  { resVernacular :: Vernacular
+  , bcDefinitions :: Set String
+  , coDefinitions :: Set String
+  }
 
 convertToGallina :: Module -> Result
 convertToGallina m = result_Syn_Module $ wrap_Module (sem_Module m) $ Inh_Module

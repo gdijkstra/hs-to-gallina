@@ -18,10 +18,10 @@ data GallinaUngroupedDefinition =
   deriving (Show, Eq)
 
 data GallinaDefinition =
-  GallinaInductive [GallinaInductiveBody]
+  GallinaInductive [GallinaInductiveBody] Bool
   | GallinaFunction GallinaFunctionBody
   | GallinaPatBinding GallinaPatBindingBody
-  | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody]
+  | GallinaFixpoint [Either GallinaFunctionBody GallinaPatBindingBody] Bool
   | GallinaThmDef GallinaTheorem
   | GallinaSetImplicit
   | GallinaUnsetImplicit

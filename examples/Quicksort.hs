@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_Hs2Gallina quicksort #-}
+{-# OPTIONS_Hs2Gallina bc: quicksort #-}
 module Quicksort where
 
 data Nat =

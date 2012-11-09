@@ -1,6 +1,6 @@
 CABAL-CONFIGURE-FLAGS := --user
 CABAL-BUILD-FLAGS     :=
-TESTFILE=examples/BCExample.hs
+TESTFILE=examples/CoinductionExample.hs
 TESTFILEBN=$(basename $(TESTFILE))
 
 default : test

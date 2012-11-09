@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_Hs2Gallina log #-}
+{-# OPTIONS_Hs2Gallina bc: log #-}
 
 module BCExample where
 

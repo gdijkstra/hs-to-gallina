@@ -1,5 +1,6 @@
 module BoveCapretta where
 
+import           AG
 import           Control.Arrow
 import           Control.Monad.State
 import qualified Data.List           as L
@@ -21,18 +22,20 @@ removeAnnotations = map removeAnnotations'
 -- composition. If we want to use a function that has been defined
 -- using B-C method, then we pretend that it's already total. The user
 -- then still needs to provide the proof.
-applyBoveCapretta ::  Vernacular -> Set String -> Vernacular
-applyBoveCapretta v funs = trace (show funs) $ v { moduleDefinitions = newDefinitions }
+applyBoveCapretta ::  Result -> Result
+applyBoveCapretta r = trace (show funs) $ r { resVernacular = v { moduleDefinitions = newDefinitions } }
   where
+    funs = bcDefinitions r
+    v = resVernacular r
     specs = constrSpecsAssocs v
     tycons = tyConstrAssocs v
-    newDefinitions = concatMap (tryApplyBC tycons specs funs) (moduleDefinitions v)
+    newDefinitions = concatMap (tryApplyBC tycons specs funs) (moduleDefinitions . resVernacular $ r)
 
 tryApplyBC :: TypeConstructors -> Specifications -> Set String -> GallinaDefinition -> [GallinaDefinition]
 tryApplyBC tycons specs funs def = case def of
-  (GallinaFixpoint [Left b]) -> apply def b (\x -> GallinaFixpoint [Left x])
-  (GallinaFunction b       ) -> apply def b GallinaFunction
-  _                          -> [def]
+  (GallinaFixpoint [Left b] c) -> apply def b (\x -> GallinaFixpoint [Left x] c)
+  (GallinaFunction b         ) -> apply def b GallinaFunction
+  _                            -> [def]
   where
     apply d b f = if (funName b) `S.member` funs
                   then concat [ [extractPredicate specs b]
@@ -50,14 +53,14 @@ type TypeConstructors = Map String [String]
 
 tyConstrAssocs :: Vernacular -> TypeConstructors
 tyConstrAssocs v = M.fromList . map toTyConstrAssoc . concat
-                 $ [is | (GallinaInductive is) <- moduleDefinitions v]
+                 $ [is | (GallinaInductive is _) <- moduleDefinitions v]
   where
     toTyConstrAssoc :: GallinaInductiveBody -> (String, [String])
     toTyConstrAssoc i = (inductiveName i, map constrName (inductiveConstrs i))
 
 constrSpecsAssocs :: Vernacular -> Specifications
 constrSpecsAssocs v = M.fromList . concatMap (map toSpecAssoc . inductiveConstrs) . concat
-                    $ [is | (GallinaInductive is) <- moduleDefinitions v]
+                    $ [is | (GallinaInductive is _) <- moduleDefinitions v]
   where
     toSpecAssoc :: GallinaConstructor -> (String, Specification)
     toSpecAssoc c = (constrName c, constrSpec c)
@@ -86,12 +89,14 @@ extractMatches fun = case funBody fun of
   _ -> error "extractPredicate: funBody is malformed."
 
 extractPredicate :: Specifications -> GallinaFunctionBody -> GallinaDefinition
-extractPredicate constrSpecAssocs fun = GallinaInductive . return $
-  GallinaInductiveBody { inductiveName = predicateName fun
+extractPredicate constrSpecAssocs fun = GallinaInductive
+  [GallinaInductiveBody { inductiveName = predicateName fun
                        , inductiveParams = freevars funtype
                        , inductiveType = fromJust . unflatTy $ args ++ [GallinaTySet]
                        , inductiveConstrs = constrs
                        }
+  ]
+  False
   where
     matches = extractMatches fun
     constrs = map (uncurry (extractConstructor specs fun)) . zip matches $ [0..]

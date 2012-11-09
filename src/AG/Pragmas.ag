@@ -1,27 +1,32 @@
 attr ModulePragmas ModulePragma
   syn bcFunctions :: {Set String}
+  syn coDefs :: {Set String}
 
 sem Module
   | Module
      loc.bcFunctions = @modulepragmas.bcFunctions
+     loc.coDefs = @modulepragmas.coDefs
 
 sem ModulePragmas
   | Nil
      lhs.bcFunctions = S.empty
+     lhs.coDefs = S.empty
   | Cons
      lhs.bcFunctions = @tl.bcFunctions `S.union` @hd.bcFunctions
+     lhs.coDefs = @tl.coDefs `S.union` @hd.coDefs
 
 {
-checkParse :: String -> Maybe Tool -> Set String
-checkParse str (Just (UnknownTool _)) = S.fromList . words $ str
-checkParse _ _ = S.empty
+checkParsePragma :: String -> String -> Maybe Tool -> Set String
+checkParsePragma pragma inp (Just (UnknownTool "Hs2Gallina")) = case words inp of
+  p : xs -> if p == pragma then S.fromList xs else S.empty
+  _ -> S.empty
+checkParsePragma _ _ _ = S.empty
 }
 
 sem ModulePragma
   | LanguagePragma AnnModulePragma
      lhs.bcFunctions = S.empty
+     lhs.coDefs = S.empty
   | OptionsPragma
-     lhs.bcFunctions = checkParse @string @toolopt
-
-
-       
+     lhs.bcFunctions = checkParsePragma "bc:" @string @toolopt
+     lhs.coDefs = checkParsePragma "co:" @string @toolopt
