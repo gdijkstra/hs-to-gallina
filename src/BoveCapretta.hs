@@ -135,8 +135,11 @@ extractType specs fun match = combine context recursiveCalls result
 -- variables bound by the patterns. This information can be extracted
 -- from the specifications of the constructors.
 extractContext :: Specifications -> Specification -> [GallinaPat] -> Context
-extractContext specs funspec pats =
-  annotatedPatsToContext (annotatePats specs funspec pats)
+extractContext specs funspec = concat . extractContexts specs funspec
+
+extractContexts :: Specifications -> Specification -> [GallinaPat] -> [Context]
+extractContexts specs funspec pats =
+  annotatedPatsToContexts (annotatePats specs funspec pats)
 
 -- Annotate variables with their type. Wildcard case is also removed.
 data GallinaPatAnnotated =
@@ -144,10 +147,10 @@ data GallinaPatAnnotated =
   | GallinaPAppAnn String [GallinaPatAnnotated]
     deriving (Show, Eq)
 
-annotatedPatsToContext :: [GallinaPatAnnotated] -> Context
-annotatedPatsToContext = concatMap f
+annotatedPatsToContexts :: [GallinaPatAnnotated] -> [Context]
+annotatedPatsToContexts = map f
   where f (GallinaPVarAnn s ty) = [(s, ty)]
-        f (GallinaPAppAnn _ ps) = annotatedPatsToContext ps
+        f (GallinaPAppAnn _ ps) = concat $ annotatedPatsToContexts ps
 
 -- Should initially be called with the specification of the function.
 annotatePats :: Specifications -> Specification
@@ -457,10 +460,18 @@ manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
 extractInvTheorems :: Specifications -> GallinaFunctionBody -> [GallinaDefinition]
 extractInvTheorems specs fun = concat $ zipWith calls matches ([0 ..] :: [Int])
   where
+    ncalls match n = length (calls match n)
+    callHyps match n = map (\m -> "Hcall" ++ show m) [0 .. ncalls match n - 1]
+    ctxEqHyps ctx n = ". intros " ++ unwords (zipWith (\_ m -> "Heq" ++ show n ++ "_ctx_" ++ show m) ctx ([0..] :: [Int]))
+                      ++ ". " ++ unwords (zipWith (\_ m -> "try (rewrite <- Heq" ++ show n ++ "_ctx_" ++ show m ++ "). ") ctx ([0..] :: [Int]))
+    eqHyps multipat = zipWith (\p n -> ". intros Heq" ++ show n ++ "; injection Heq" ++ show n ++ ctxEqHyps p n)
+                      (contexts multipat)
+                      [0 .. arity - 1]
     arity = funArity fun
     matches = extractMatches fun
     params = map (\v -> (v, GallinaTySet)) . foldr L.union [] . map freevars $ argTys
-    context multipat = extractContext specs (funSpec fun) multipat
+    context = concat . contexts
+    contexts multipat = extractContexts specs (funSpec fun) multipat
     predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar (map fst args)
     argTys = case funSpec fun of Spec a _ -> a
     args = zipWith (\n t -> ("x" ++ show n, t)) [0 .. arity - 1] argTys
@@ -471,5 +482,8 @@ extractInvTheorems specs fun = concat $ zipWith calls matches ([0 ..] :: [Int])
     mkTheorem match n call m = GallinaThmDef $ GallinaTheorem
                            { theoremName = funName fun ++ "_acc_inv_" ++ show n ++ "_" ++ show m
                            , theoremProp = GallinaTyPi (params ++ args ++ context (matchPats match)) (ty call (matchPats match))
-                           , theoremProof = "admit."
+                           , theoremProof = "intros " ++ unwords (map fst (params ++ args ++ context (matchPats match)))
+                                            ++ " H; case H; try (intros; discriminate)."
+                                            ++ " intros " ++ unwords (map ((++ "'") . fst) (context (matchPats match)) ++ callHyps match n ++ eqHyps (matchPats match))
+                                            ++ "assumption."
                            }
