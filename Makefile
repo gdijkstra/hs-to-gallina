@@ -1,6 +1,6 @@
 CABAL-CONFIGURE-FLAGS := --user
 CABAL-BUILD-FLAGS     :=
-TESTFILE=examples/CoinductionExample.hs
+TESTFILE=examples/ListTest.hs
 TESTFILEBN=$(basename $(TESTFILE))
 
 default : test
@@ -16,14 +16,18 @@ haskell : src/AG.hs
 	runhaskell Setup.hs configure $(CABAL-CONFIGURE-FLAGS)
 	runhaskell Setup.hs build $(CABAL-BUILD-FLAGS)
 
-test : all clean-coq-tmp
+test : all clean-coq-tmp prelude
 	@echo "Make: running program..."
 	./dist/build/HsToGallina/HsToGallina -w $(TESTFILE)
 	@echo "Make: running coqc..."
-	coqc $(TESTFILEBN).v
+	coqc -I examples $(TESTFILEBN).v
 	@if [ $$? -eq 0 ] ; then echo "Make: coqc run succesfully" ; else echo "Error: coqc run unsuccesfully"; fi
 
+prelude: examples/Prelude.v
+	coqc examples/Prelude.v
+
 clean-coq-tmp:
+	rm examples/Prelude.glob examples/Prelude.vo
 	rm -f $(TESTFILEBN).glob $(TESTFILEBN).v $(TESTFILEBN).vo
 
 clean: clean-coq-tmp

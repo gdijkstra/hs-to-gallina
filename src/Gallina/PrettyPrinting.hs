@@ -27,14 +27,15 @@ ppGroup :: (Pp a) => String -> [a] -> Doc
 ppGroup name is = text name <+> vcat (intersperse (text "with") . map pp $ is)
 
 ppGroupDotted :: (Pp a) => String -> [a] -> Doc
-ppGroupDotted name is = ppGroup name is <> text "."
+ppGroupDotted name is = ppGroup name is <> char '.'
 
 
 instance Pp Vernacular where
-  pp a = vsep [text "Module" <+> text (moduleName a) <> text "."
+  pp a = vsep [text "Module" <+> text (moduleName a) <> char '.'
+              , text "Require Import Prelude."
               , text "Set Contextual Implicit."
               , vsep (map pp (moduleDefinitions a))
-              , text "End" <+> text (moduleName a) <> text "."
+              , text "End" <+> text (moduleName a) <> char '.'
               ]
 
 
@@ -149,6 +150,7 @@ instance Pp GallinaType where
   ppPrec _ (GallinaTyVar s      ) = text s
   ppPrec _ (GallinaTyCon s      ) = text s
   ppPrec _ (GallinaTySet        ) = text "Set"
+  ppPrec _ (GallinaTyProp       ) = text "Prop"
   ppPrec p (GallinaTyPi st t1   ) = parensIf (p > 0) $ hsep [ text "forall"
                                                             , hsep
                                                               . map (\(s,t) -> parens (hsep [text s, text ":", pp t]))
@@ -160,6 +162,7 @@ instance Pp GallinaType where
                                                             , text "="
                                                             , pp t2
                                                             ]
+  ppPrec p (GallinaTyList t     ) = parensIf (p > 1) $ text "List" <+> ppPrec 2 t
 
 instance Pp GallinaTerm where
   ppPrec _ (GallinaVar s        ) = text s
@@ -186,12 +189,13 @@ instance Pp GallinaTerm where
                                         , text "else", pp f
                                         ]
   ppPrec _ (GallinaTyTerm ty    ) = ppPrec 2 ty
+  ppPrec _ (GallinaList ts      ) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
 
 instance Pp GallinaTheorem where
   ppPrec _ thm = vcat [ hsep [ text "Theorem"
                              , text (theoremName thm)
                              , text ":", pp (theoremProp thm)
-                             , text "."
+                             , char '.'
                              ]
                       , text (theoremProof thm)
                       , text "Defined."

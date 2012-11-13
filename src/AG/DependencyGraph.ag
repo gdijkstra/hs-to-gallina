@@ -11,7 +11,7 @@ sem Decl
 
 
 attr Match Matches Rhs Exp QualConDecl QualConDecls ConDecl BangType
-  BangTypes Type Alt Alts GuardedAlts Binds Decls Decl
+  BangTypes Type Alt Alts GuardedAlts Binds Decls Decl Exps
   syn dependencies :: {[String]}
 
 sem Matches
@@ -50,7 +50,9 @@ sem Exp
      lhs.dependencies = @binds.dependencies
                         ++ (@binds.names `difference` @exp.dependencies)
 
-  | NegApp InfixApp IPVar If Do MDo Tuple TupleSection List BracketExp
+  | List
+     lhs.dependencies = @exps.dependencies
+  | NegApp InfixApp IPVar If Do MDo Tuple TupleSection BracketExp
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
@@ -58,7 +60,7 @@ sem Exp
     LeftArrHighApp RightArrHighApp
      lhs.dependencies = error "dependencies: Unsupported construct exp"
 
-sem QualConDecls
+sem Exps QualConDecls
   | Nil
      lhs.dependencies = []              
   | Cons

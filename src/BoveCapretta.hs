@@ -92,7 +92,7 @@ extractPredicate :: Specifications -> GallinaFunctionBody -> GallinaDefinition
 extractPredicate constrSpecAssocs fun = GallinaInductive
   [GallinaInductiveBody { inductiveName = predicateName fun
                        , inductiveParams = freevars funtype
-                       , inductiveType = fromJust . unflatTy $ args ++ [GallinaTySet]
+                       , inductiveType = fromJust . unflatTy $ args ++ [GallinaTyProp]
                        , inductiveConstrs = constrs
                        }
   ]
@@ -181,10 +181,12 @@ mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySub
 mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
 mkTySubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
+mkTySubst a ty (GallinaTyList t     ) = GallinaTyList (mkTySubst a ty t)
 mkTySubst _ _  GallinaTySet           = GallinaTySet
+mkTySubst _ _  GallinaTyProp          = GallinaTyProp
 mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: tyforall not allowed."
 mkTySubst _ _  (GallinaTyEq _ _     ) = error "mkTySubst: type equality not allowed."
-mkTySubst _ _  (GallinaTyPi _ _   ) = error "mkTySubst: typi not allowed."
+mkTySubst _ _  (GallinaTyPi _ _     ) = error "mkTySubst: typi not allowed."
 
 -- left type should be more general than right type.
 unifyTypes :: GallinaType -> GallinaType -> TySubst
@@ -402,12 +404,14 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
                                              $ multiPatsSubs
 
 getTypeConstr :: GallinaType -> String
+getTypeConstr (GallinaTyList _     ) = "List"
 getTypeConstr (GallinaTyApp l _    ) = getTypeConstr l
 getTypeConstr (GallinaTyCon c      ) = c
 getTypeConstr (GallinaTyForall _ _ ) = error "getTypeConstr: foralls not supported."
 getTypeConstr (GallinaTyFun _ _    ) = error "getTypeConstr: function types not supported."
 getTypeConstr (GallinaTyVar _      ) = error "getTypeConstr: type var not supported."
 getTypeConstr GallinaTySet           = error "getTypeConstr: set type not supported."
+getTypeConstr GallinaTyProp          = error "getTypeConstr: prop type not supported."
 getTypeConstr (GallinaTyPi _ _     ) = error "getTypeConstr: pi types not supported."
 getTypeConstr (GallinaTyEq _ _     ) = error "getTypeConstr: type equality"
 

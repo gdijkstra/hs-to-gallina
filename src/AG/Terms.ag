@@ -128,7 +128,9 @@ sem Exp
      lhs.gallinaTerm = GallinaIf @exp.gallinaTerm @exp1.gallinaTerm @exp2.gallinaTerm
   | Paren
      lhs.gallinaTerm = @exp.gallinaTerm
-  | NegApp InfixApp IPVar Do MDo Tuple TupleSection List
+  | List
+     lhs.gallinaTerm = GallinaList @exps.gallinaTerms
+  | NegApp InfixApp IPVar Do MDo Tuple TupleSection
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote BracketExp SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
@@ -136,3 +138,11 @@ sem Exp
     LeftArrHighApp RightArrHighApp 
      lhs.gallinaTerm = error "unsupported gallinaTerm"
 
+attr Exps
+  syn gallinaTerms :: {[GallinaTerm]}
+
+sem Exps
+  | Nil
+     lhs.gallinaTerms = []
+  | Cons
+     lhs.gallinaTerms = @hd.gallinaTerm : @tl.gallinaTerms

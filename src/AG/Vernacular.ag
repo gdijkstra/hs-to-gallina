@@ -35,9 +35,11 @@ typeDeps (GallinaTyPi _ _        ) = error "typeDeps: pi types should not occur 
 typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
 typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
+typeDeps (GallinaTyList t        ) = typeDeps t
 typeDeps (GallinaTyVar _         ) = []
 typeDeps (GallinaTyCon v         ) = [v]
 typeDeps (GallinaTySet           ) = []
+typeDeps (GallinaTyProp          ) = []
 
 associateTypes :: Map String GallinaType -> DeclDeps -> DeclDeps 
 associateTypes types declDeps = map f declDeps

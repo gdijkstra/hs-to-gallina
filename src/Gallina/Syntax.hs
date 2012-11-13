@@ -91,7 +91,9 @@ data GallinaType =
   | GallinaTyApp GallinaType GallinaType
   | GallinaTyVar String
   | GallinaTyCon String
+  | GallinaTyList GallinaType
   | GallinaTySet
+  | GallinaTyProp
   | GallinaTyPi [(String, GallinaType)] GallinaType
   | GallinaTyEq GallinaType GallinaType
   deriving (Show, Eq)
@@ -106,6 +108,7 @@ data GallinaTerm =
   | GallinaLet [GallinaLetDefinition] GallinaTerm
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   | GallinaTyTerm GallinaType
+  | GallinaList [GallinaTerm]
   deriving (Show, Eq)
 
 data GallinaTheorem =
@@ -131,6 +134,8 @@ ftv (GallinaTyApp l r    ) = union (ftv l) (ftv r)
 ftv (GallinaTyVar str    ) = return str
 ftv (GallinaTyCon _      ) = []
 ftv (GallinaTySet        ) = []
+ftv (GallinaTyProp       ) = []
+ftv (GallinaTyList t     ) = ftv t
 
 -- Replace the GallinaTyFun constructor by (:).
 flatTy :: GallinaType -> [GallinaType]
@@ -140,6 +145,8 @@ flatTy ty@(GallinaTyApp _ _  ) = [ty]
 flatTy ty@(GallinaTyVar _    ) = [ty]
 flatTy ty@(GallinaTyCon _    ) = [ty]
 flatTy ty@(GallinaTySet      ) = [ty]
+flatTy ty@(GallinaTyProp     ) = [ty]
+flatTy ty@(GallinaTyList _   ) = [ty]
 flatTy (GallinaTyPi _ _      ) = error "flatTy: pi types should not occur here"
 flatTy (GallinaTyEq _ _      ) = error "flatTy: equality types should not occur here"
 

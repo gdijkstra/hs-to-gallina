@@ -62,7 +62,9 @@ sem Type
      lhs.gallinaType = GallinaTyCon @qname.name
   | TyParen
      lhs.gallinaType = @ty.gallinaType
-  | TyForall TyTuple TyList TyInfix TyKind
+  | TyList
+     lhs.gallinaType = GallinaTyList @ty.gallinaType
+  | TyForall TyTuple TyInfix TyKind
      lhs.gallinaType = error "gallinaType: unsupported construct"
 
 -- Missing rules for inherited attributes
