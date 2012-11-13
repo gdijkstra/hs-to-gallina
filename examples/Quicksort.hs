@@ -16,9 +16,9 @@ data Bool =
 
 filter :: (a -> Bool) -> List a -> List a
 filter p Nil         = Nil
-filter p (Cons x xs) = if p x
-                       then Cons x (filter p xs)
-                       else filter p xs
+filter p (Cons x xs) = case p x of
+  True -> Cons x (filter p xs)
+  False -> filter p xs
 
 lt :: Nat -> Nat -> Bool
 lt Zero     Zero     = False
