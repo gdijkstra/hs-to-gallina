@@ -38,7 +38,9 @@ sem Pat
   | PParen
      lhs.gallinaPat = @pat.gallinaPat
      lhs.var = @pat.var
-  | PNPlusK PInfixApp PTuple PList PRec PAsPat PIrrPat PatTypeSig PViewPat
+  | PTuple
+     lhs.gallinaPat = GallinaPTuple @pats.gallinaPats
+  | PNPlusK PInfixApp PList PRec PAsPat PIrrPat PatTypeSig PViewPat
     PRPat PXTag PXETag PXPcdata PXPatTag PXRPats PExplTypeArg PQuasiQuote
     PBangPat PNeg
      lhs.gallinaPat = error "unsupported pattern"
@@ -130,13 +132,25 @@ sem Exp
      lhs.gallinaTerm = @exp.gallinaTerm
   | List
      lhs.gallinaTerm = GallinaList @exps.gallinaTerms
-  | NegApp InfixApp IPVar Do MDo Tuple TupleSection
+  | Tuple
+     lhs.gallinaTerm = GallinaTuple @exps.gallinaTerms
+  | InfixApp
+     lhs.gallinaTerm = undefined --GallinaApp (GallinaApp @qop.gallinaTerm @exp.gallinaTerm) @exp1.gallinaTerm
+  | NegApp IPVar Do MDo TupleSection
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote BracketExp SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
     XChildTag CorePragma SCCPragma GenPragma Proc LeftArrApp RightArrApp
     LeftArrHighApp RightArrHighApp 
      lhs.gallinaTerm = error "unsupported gallinaTerm"
+
+
+-- TODO: dit
+-- attr QOp QName
+--  syn gallinaTerm :: GallinaTerm
+
+-- sem QOp
+-- TODO: dit
 
 attr Exps
   syn gallinaTerms :: {[GallinaTerm]}

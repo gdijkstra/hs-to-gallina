@@ -177,6 +177,7 @@ substituteSpec (Spec args res) ty = Spec (map subst args) (subst res)
 type TySubst = GallinaType -> GallinaType
 
 mkTySubst :: String -> GallinaType -> TySubst
+mkTySubst a ty (GallinaTyTuple ts   ) = GallinaTyTuple (map (mkTySubst a ty) ts)
 mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
@@ -237,6 +238,7 @@ resultType _   []   = error "resultType: pats list should never be empty"
 resultType fun pats = foldl1 GallinaTyApp $ GallinaTyCon (predicateName fun) : map patternToType pats
 
 patternToType :: GallinaPat -> GallinaType
+patternToType (GallinaPTuple ps ) = GallinaTyTuple . map patternToType $ ps
 patternToType (GallinaPVar s    ) = GallinaTyVar s
 patternToType (GallinaPApp s ps ) = foldl GallinaTyApp (GallinaTyCon s)
                                     . map patternToType $ ps
@@ -404,6 +406,7 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
                                              $ multiPatsSubs
 
 getTypeConstr :: GallinaType -> String
+getTypeConstr (GallinaTyTuple _    ) = "*"
 getTypeConstr (GallinaTyList _     ) = "List"
 getTypeConstr (GallinaTyApp l _    ) = getTypeConstr l
 getTypeConstr (GallinaTyCon c      ) = c

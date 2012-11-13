@@ -11,12 +11,19 @@ sem Decl
 
 
 attr Match Matches Rhs Exp QualConDecl QualConDecls ConDecl BangType
-  BangTypes Type Alt Alts GuardedAlts Binds Decls Decl Exps
+  BangTypes Type Alt Alts GuardedAlts Binds Decls Decl Exps QOp QName
+  Types
   syn dependencies :: {[String]}
 
-sem Matches
+sem Decls
   | Nil
      lhs.dependencies = []
+  | Cons
+     lhs.dependencies = @hd.names `difference` (@hd.dependencies ++ @tl.dependencies)
+
+sem Alts BangTypes Exps QualConDecls Matches Types
+  | Nil
+     lhs.dependencies = []              
   | Cons
      lhs.dependencies = @hd.dependencies ++ @tl.dependencies
 
@@ -52,7 +59,11 @@ sem Exp
 
   | List
      lhs.dependencies = @exps.dependencies
-  | NegApp InfixApp IPVar If Do MDo Tuple TupleSection BracketExp
+  | InfixApp
+     lhs.dependencies = @exp.dependencies ++ @qop.dependencies ++ @exp1.dependencies
+  | Tuple
+     lhs.dependencies = @exps.dependencies
+  | NegApp IPVar If Do MDo TupleSection BracketExp
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
@@ -60,12 +71,18 @@ sem Exp
     LeftArrHighApp RightArrHighApp
      lhs.dependencies = error "dependencies: Unsupported construct exp"
 
-sem Exps QualConDecls
-  | Nil
-     lhs.dependencies = []              
-  | Cons
-     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
-    
+sem QOp
+  | *
+     lhs.dependencies = @qname.dependencies
+
+sem QName
+  | Qual
+     lhs.dependencies = [@modulename.name ++ "." ++ @name.name]
+  | UnQual
+     lhs.dependencies = [@name.name]
+  | Special
+     lhs.dependencies = []
+
 sem QualConDecl
   | QualConDecl
      lhs.dependencies = @condecl.dependencies
@@ -76,12 +93,6 @@ sem ConDecl
   | InfixConDecl RecDecl
      lhs.dependencies = error "dependencies: Unsupported construct condecl"
 
-sem BangTypes
-  | Nil
-     lhs.dependencies = []
-  | Cons
-     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
-                  
 sem BangType
   | UnBangedTy
      lhs.dependencies = @ty.dependencies
@@ -99,14 +110,12 @@ sem Type
      lhs.dependencies = [@qname.name]
   | TyParen
      lhs.dependencies = @ty.dependencies
-  | TyForall TyTuple TyList TyInfix TyKind
+  | TyTuple
+     lhs.dependencies = @types.dependencies
+  | TyList
+     lhs.dependencies = @ty.dependencies
+  | TyForall TyInfix TyKind
      lhs.dependencies = error "dependencies: Unsupported construct type"
-
-sem Alts
-  | Nil
-     lhs.dependencies = []              
-  | Cons
-     lhs.dependencies = @hd.dependencies ++ @tl.dependencies
 
 sem Alt
   | Alt
@@ -123,12 +132,6 @@ sem Binds
      lhs.dependencies = @decls.dependencies
   | IPBinds
      lhs.dependencies = error "implicit parameters unsupported"
-
-sem Decls
-  | Nil
-     lhs.dependencies = []
-  | Cons
-     lhs.dependencies = @hd.names `difference` (@hd.dependencies ++ @tl.dependencies)
 
 attr Binds Decls Decl
   syn names :: {[String]}

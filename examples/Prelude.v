@@ -22,3 +22,7 @@ Notation "[ x , .. , y ]" := (cons x .. (cons y nil) ..).
 Extract Inductive list => "List" [ "[]" "(:)" ].
 Extract Constant List "a" => "[a]".
 Extract Inlined Constant app => "(Prelude.++)".
+
+(* Tuples *)
+
+Extract Inductive prod => "(,)" [ "(,)" ].

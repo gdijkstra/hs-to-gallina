@@ -29,7 +29,6 @@ ppGroup name is = text name <+> vcat (intersperse (text "with") . map pp $ is)
 ppGroupDotted :: (Pp a) => String -> [a] -> Doc
 ppGroupDotted name is = ppGroup name is <> char '.'
 
-
 instance Pp Vernacular where
   pp a = vsep [text "Module" <+> text (moduleName a) <> char '.'
               , text "Require Import Prelude."
@@ -37,7 +36,6 @@ instance Pp Vernacular where
               , vsep (map pp (moduleDefinitions a))
               , text "End" <+> text (moduleName a) <> char '.'
               ]
-
 
 instance Pp GallinaUngroupedDefinition where
   pp a = text "Ungrouped" <> pp a
@@ -52,7 +50,6 @@ instance Pp GallinaDefinition where
   pp (GallinaThmDef d    ) = pp d
   pp GallinaSetImplicit    = text "Set Implicit Arguments."
   pp GallinaUnsetImplicit  = text "Unset Implicit Arguments."
-
 
 instance Pp GallinaLetDefinition where
   pp (GallinaLetFixpoint b   ) = ppGroup "fix" [b]
@@ -141,6 +138,7 @@ instance Pp GallinaMatch where
 instance Pp GallinaPat where
   ppPrec _ (GallinaPVar s    ) = text s
   ppPrec p (GallinaPApp s ps ) = parensIf (p > 0 && not (null ps)) $ hsep (text s : map (ppPrec 1) ps)
+  ppPrec _ (GallinaPTuple ps ) = char '(' <> (hcat . intersperse (text ", ") . map pp $ ps) <> char ')'
   ppPrec _ GallinaPWildCard    = text "_"
 
 instance Pp GallinaType where
@@ -163,6 +161,7 @@ instance Pp GallinaType where
                                                             , pp t2
                                                             ]
   ppPrec p (GallinaTyList t     ) = parensIf (p > 1) $ text "List" <+> ppPrec 2 t
+  ppPrec p (GallinaTyTuple ts   ) = parensIf (p > 0) $ hcat . intersperse (text " * ") . map (ppPrec 1) $ ts
 
 instance Pp GallinaTerm where
   ppPrec _ (GallinaVar s        ) = text s
@@ -190,6 +189,7 @@ instance Pp GallinaTerm where
                                         ]
   ppPrec _ (GallinaTyTerm ty    ) = ppPrec 2 ty
   ppPrec _ (GallinaList ts      ) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
+  ppPrec _ (GallinaTuple ts     ) = char '(' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ')'
 
 instance Pp GallinaTheorem where
   ppPrec _ thm = vcat [ hsep [ text "Theorem"

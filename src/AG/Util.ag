@@ -8,7 +8,6 @@ third :: (c -> d) -> (a, b, c) -> (a, b, d)
 third f = \(a, b, c) -> (a, b, f c)
 }
 
-
 -- Name stuff
 
 attr Names
@@ -37,7 +36,7 @@ sem QName
   | UnQual
      lhs.name = @name.name
   | Special
-     lhs.name = error "name: Unsupported construct."
+     lhs.name = []
                           
 sem TyVarBind
   | KindedVar

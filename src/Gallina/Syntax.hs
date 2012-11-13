@@ -80,6 +80,7 @@ data GallinaMatch =
 
 data GallinaPat =
   GallinaPVar String
+  | GallinaPTuple [GallinaPat]
   | GallinaPApp String [GallinaPat]
   | GallinaPWildCard
   deriving (Show, Eq)
@@ -92,6 +93,7 @@ data GallinaType =
   | GallinaTyVar String
   | GallinaTyCon String
   | GallinaTyList GallinaType
+  | GallinaTyTuple [GallinaType]
   | GallinaTySet
   | GallinaTyProp
   | GallinaTyPi [(String, GallinaType)] GallinaType
@@ -109,6 +111,7 @@ data GallinaTerm =
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   | GallinaTyTerm GallinaType
   | GallinaList [GallinaTerm]
+  | GallinaTuple [GallinaTerm]
   deriving (Show, Eq)
 
 data GallinaTheorem =
@@ -125,6 +128,9 @@ generalise ty = let vars = ftv ty in if not (null vars)
                                      then GallinaTyForall vars ty
                                      else ty
 
+unions :: Eq a => [[a]] -> [a]
+unions = foldr union []
+
 ftv :: GallinaType -> [String]
 ftv (GallinaTyForall _ _ ) = error "ftv: foralls should not occur here"
 ftv (GallinaTyPi _ _     ) = error "ftv: pi types should not occur here"
@@ -136,6 +142,7 @@ ftv (GallinaTyCon _      ) = []
 ftv (GallinaTySet        ) = []
 ftv (GallinaTyProp       ) = []
 ftv (GallinaTyList t     ) = ftv t
+ftv (GallinaTyTuple ts   ) = unions . map ftv $ ts
 
 -- Replace the GallinaTyFun constructor by (:).
 flatTy :: GallinaType -> [GallinaType]
@@ -147,6 +154,7 @@ flatTy ty@(GallinaTyCon _    ) = [ty]
 flatTy ty@(GallinaTySet      ) = [ty]
 flatTy ty@(GallinaTyProp     ) = [ty]
 flatTy ty@(GallinaTyList _   ) = [ty]
+flatTy ty@(GallinaTyTuple _  ) = [ty]
 flatTy (GallinaTyPi _ _      ) = error "flatTy: pi types should not occur here"
 flatTy (GallinaTyEq _ _      ) = error "flatTy: equality types should not occur here"
 
@@ -175,5 +183,6 @@ resTy arity ty = snd . argsResTy arity $ ty
 patVars :: GallinaPat -> [String]
 patVars (GallinaPVar s    ) = [s]
 patVars (GallinaPApp s ps ) = s : concatMap patVars ps
+patVars (GallinaPTuple ps ) = concatMap patVars ps
 patVars GallinaPWildCard    = []
 

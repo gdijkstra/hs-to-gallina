@@ -1,5 +1,14 @@
 module ListTest where
 
+tupleTest0 :: (Bool, (Bool, Bool), Bool)
+tupleTest0 = (True, (False, True), False)
+
+swap :: (a, (b, c)) -> ((c, b), a)
+swap (x, (y, z)) = ((z, y), x)
+
+swap' :: (a, b, c) -> (c, b, a)
+swap' (a,b,c) = (c,b,a)
+
 testList0 :: [Bool]
 testList0 = []
 
