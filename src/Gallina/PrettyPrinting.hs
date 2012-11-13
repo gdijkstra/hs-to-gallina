@@ -139,6 +139,7 @@ instance Pp GallinaPat where
   ppPrec _ (GallinaPVar s    ) = text s
   ppPrec p (GallinaPApp s ps ) = parensIf (p > 0 && not (null ps)) $ hsep (text s : map (ppPrec 1) ps)
   ppPrec _ (GallinaPTuple ps ) = char '(' <> (hcat . intersperse (text ", ") . map pp $ ps) <> char ')'
+  ppPrec _ (GallinaPList ps  ) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ps) <> char ']'
   ppPrec _ GallinaPWildCard    = text "_"
 
 instance Pp GallinaType where
@@ -161,6 +162,7 @@ instance Pp GallinaType where
                                                             , pp t2
                                                             ]
   ppPrec p (GallinaTyList t     ) = parensIf (p > 1) $ text "List" <+> ppPrec 2 t
+  ppPrec _ (GallinaTyListTerm ts) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
   ppPrec p (GallinaTyTuple ts   ) = parensIf (p > 0) $ hcat . intersperse (text " * ") . map (ppPrec 1) $ ts
 
 instance Pp GallinaTerm where

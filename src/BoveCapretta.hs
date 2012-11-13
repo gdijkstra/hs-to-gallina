@@ -177,6 +177,7 @@ substituteSpec (Spec args res) ty = Spec (map subst args) (subst res)
 type TySubst = GallinaType -> GallinaType
 
 mkTySubst :: String -> GallinaType -> TySubst
+mkTySubst a ty (GallinaTyListTerm ts) = GallinaTyListTerm (map (mkTySubst a ty) ts)
 mkTySubst a ty (GallinaTyTuple ts   ) = GallinaTyTuple (map (mkTySubst a ty) ts)
 mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
@@ -239,6 +240,7 @@ resultType fun pats = foldl1 GallinaTyApp $ GallinaTyCon (predicateName fun) : m
 
 patternToType :: GallinaPat -> GallinaType
 patternToType (GallinaPTuple ps ) = GallinaTyTuple . map patternToType $ ps
+patternToType (GallinaPList ps  ) = GallinaTyListTerm . map patternToType $ ps
 patternToType (GallinaPVar s    ) = GallinaTyVar s
 patternToType (GallinaPApp s ps ) = foldl GallinaTyApp (GallinaTyCon s)
                                     . map patternToType $ ps
@@ -406,6 +408,7 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
                                              $ multiPatsSubs
 
 getTypeConstr :: GallinaType -> String
+getTypeConstr (GallinaTyListTerm _ ) = error "getTypeConstr: lists not supported."
 getTypeConstr (GallinaTyTuple _    ) = "*"
 getTypeConstr (GallinaTyList _     ) = "List"
 getTypeConstr (GallinaTyApp l _    ) = getTypeConstr l

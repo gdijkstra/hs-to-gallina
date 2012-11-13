@@ -81,6 +81,7 @@ data GallinaMatch =
 data GallinaPat =
   GallinaPVar String
   | GallinaPTuple [GallinaPat]
+  | GallinaPList [GallinaPat]
   | GallinaPApp String [GallinaPat]
   | GallinaPWildCard
   deriving (Show, Eq)
@@ -93,6 +94,7 @@ data GallinaType =
   | GallinaTyVar String
   | GallinaTyCon String
   | GallinaTyList GallinaType
+  | GallinaTyListTerm [GallinaType]
   | GallinaTyTuple [GallinaType]
   | GallinaTySet
   | GallinaTyProp
@@ -143,20 +145,22 @@ ftv (GallinaTySet        ) = []
 ftv (GallinaTyProp       ) = []
 ftv (GallinaTyList t     ) = ftv t
 ftv (GallinaTyTuple ts   ) = unions . map ftv $ ts
+ftv (GallinaTyListTerm ts) = unions . map ftv $ ts
 
 -- Replace the GallinaTyFun constructor by (:).
 flatTy :: GallinaType -> [GallinaType]
-flatTy (GallinaTyForall _ ty ) = flatTy ty
-flatTy (GallinaTyFun l r     ) = l : flatTy r
-flatTy ty@(GallinaTyApp _ _  ) = [ty]
-flatTy ty@(GallinaTyVar _    ) = [ty]
-flatTy ty@(GallinaTyCon _    ) = [ty]
-flatTy ty@(GallinaTySet      ) = [ty]
-flatTy ty@(GallinaTyProp     ) = [ty]
-flatTy ty@(GallinaTyList _   ) = [ty]
-flatTy ty@(GallinaTyTuple _  ) = [ty]
-flatTy (GallinaTyPi _ _      ) = error "flatTy: pi types should not occur here"
-flatTy (GallinaTyEq _ _      ) = error "flatTy: equality types should not occur here"
+flatTy (GallinaTyForall _ ty   ) = flatTy ty
+flatTy (GallinaTyFun l r       ) = l : flatTy r
+flatTy ty@(GallinaTyApp _ _    ) = [ty]
+flatTy ty@(GallinaTyVar _      ) = [ty]
+flatTy ty@(GallinaTyCon _      ) = [ty]
+flatTy ty@(GallinaTySet        ) = [ty]
+flatTy ty@(GallinaTyProp       ) = [ty]
+flatTy ty@(GallinaTyList _     ) = [ty]
+flatTy ty@(GallinaTyTuple _    ) = [ty]
+flatTy ty@(GallinaTyListTerm _ ) = [ty]
+flatTy (GallinaTyPi _ _        ) = error "flatTy: pi types should not occur here"
+flatTy (GallinaTyEq _ _        ) = error "flatTy: equality types should not occur here"
 
 -- Inverse of flatTy.
 unflatTy :: [GallinaType] -> Maybe GallinaType
@@ -184,5 +188,5 @@ patVars :: GallinaPat -> [String]
 patVars (GallinaPVar s    ) = [s]
 patVars (GallinaPApp s ps ) = s : concatMap patVars ps
 patVars (GallinaPTuple ps ) = concatMap patVars ps
+patVars (GallinaPList ps  ) = concatMap patVars ps
 patVars GallinaPWildCard    = []
-

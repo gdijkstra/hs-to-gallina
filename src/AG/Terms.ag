@@ -7,7 +7,6 @@ attr Pats
   syn vars :: {[String]}
   syn arity :: Int
 
-
 sem Pats
   | Nil
      lhs.gallinaPats = []
@@ -30,7 +29,7 @@ sem Pat
      lhs.gallinaPat = GallinaPVar (prettyPrint @literal)
      lhs.var = error "unsupported pattern in lambda"
   | PApp
-     lhs.gallinaPat = GallinaPApp @qname.name @pats.gallinaPats
+     lhs.gallinaPat = GallinaPApp (patToString @qname.gallinaPat) @pats.gallinaPats
      lhs.var = error "unsupported pattern in lambda"
   | PWildCard
      lhs.gallinaPat = GallinaPWildCard
@@ -40,13 +39,44 @@ sem Pat
      lhs.var = @pat.var
   | PTuple
      lhs.gallinaPat = GallinaPTuple @pats.gallinaPats
-  | PNPlusK PInfixApp PList PRec PAsPat PIrrPat PatTypeSig PViewPat
+     lhs.var = error "unsupported pattern in lambda"
+  | PList
+     lhs.gallinaPat = GallinaPList @pats.gallinaPats
+     lhs.var = error "unsupported pattern in lambda"
+  | PInfixApp
+     lhs.gallinaPat = GallinaPApp (patToString @qname.gallinaPat) [@pat.gallinaPat, @pat1.gallinaPat]
+  | PNPlusK PRec PAsPat PIrrPat PatTypeSig PViewPat
     PRPat PXTag PXETag PXPcdata PXPatTag PXRPats PExplTypeArg PQuasiQuote
     PBangPat PNeg
      lhs.gallinaPat = error "unsupported pattern"
      lhs.var = error "unsupported pattern in lambda"
 
--- Pattern gallinaMatching
+{
+patToString :: GallinaPat -> String
+patToString (GallinaPVar s) = s
+patToString _ = error "patToString: not a pat var."
+}
+
+attr QName SpecialCon
+  syn gallinaPat :: GallinaPat
+
+sem QName
+  | Qual
+     lhs.gallinaPat = GallinaPVar (@modulename.name ++ "." ++ @name.name)
+  | UnQual
+     lhs.gallinaPat = GallinaPVar @name.name
+  | Special
+     lhs.gallinaPat = @specialcon.gallinaPat
+
+sem SpecialCon
+  | UnitCon
+     lhs.gallinaPat = GallinaPVar "tt"
+  | Cons
+     lhs.gallinaPat = GallinaPVar "cons"
+  | ListCon FunCon TupleCon UnboxedSingleCon
+     lhs.gallinaPat = error "unsupported gallinaPat"
+
+-- Pattern matching
 {
 attachBindings :: GallinaTerm -> [GallinaLetDefinition] -> GallinaTerm
 attachBindings t []       = t
@@ -113,9 +143,9 @@ attr Exp
               
 sem Exp              
   | Var
-     lhs.gallinaTerm = GallinaVar @qname.name
+     lhs.gallinaTerm = @qname.gallinaTerm
   | Con
-     lhs.gallinaTerm = GallinaVar @qname.name
+     lhs.gallinaTerm = @qname.gallinaTerm
   | Lit
     lhs.gallinaTerm = GallinaVar (prettyPrint @literal)
   | App
@@ -135,7 +165,7 @@ sem Exp
   | Tuple
      lhs.gallinaTerm = GallinaTuple @exps.gallinaTerms
   | InfixApp
-     lhs.gallinaTerm = undefined --GallinaApp (GallinaApp @qop.gallinaTerm @exp.gallinaTerm) @exp1.gallinaTerm
+     lhs.gallinaTerm = GallinaApp (GallinaApp @qop.gallinaTerm @exp.gallinaTerm) @exp1.gallinaTerm
   | NegApp IPVar Do MDo TupleSection
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
@@ -145,12 +175,28 @@ sem Exp
      lhs.gallinaTerm = error "unsupported gallinaTerm"
 
 
--- TODO: dit
--- attr QOp QName
---  syn gallinaTerm :: GallinaTerm
+attr QOp QName SpecialCon
+  syn gallinaTerm :: GallinaTerm
 
--- sem QOp
--- TODO: dit
+sem QOp
+  | *
+    lhs.gallinaTerm = @qname.gallinaTerm
+
+sem QName
+  | Qual
+     lhs.gallinaTerm = GallinaVar (@modulename.name ++ "." ++ @name.name)
+  | UnQual
+     lhs.gallinaTerm = GallinaVar @name.name
+  | Special
+     lhs.gallinaTerm = @specialcon.gallinaTerm
+
+sem SpecialCon
+  | UnitCon
+     lhs.gallinaTerm = GallinaVar "tt"
+  | Cons
+     lhs.gallinaTerm = GallinaVar "cons"
+  | ListCon FunCon TupleCon UnboxedSingleCon
+     lhs.gallinaTerm = error "unsupported gallinaTerm"
 
 attr Exps
   syn gallinaTerms :: {[GallinaTerm]}

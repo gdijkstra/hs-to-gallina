@@ -30,6 +30,7 @@ ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
 ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
 
 typeDeps :: GallinaType -> [String]
+typeDeps (GallinaTyListTerm ts   ) = concatMap typeDeps ts
 typeDeps (GallinaTyTuple ts      ) = concatMap typeDeps ts
 typeDeps (GallinaTyEq _ _        ) = error "typeDeps: eq types should not occur here"
 typeDeps (GallinaTyPi _ _        ) = error "typeDeps: pi types should not occur here"

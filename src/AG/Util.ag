@@ -19,7 +19,7 @@ sem Names
   | Cons
      lhs.names = @hd.name : @tl.names
 
-attr ModuleName Name QName TyVarBind Matches Match
+attr ModuleName Name QName TyVarBind Matches Match SpecialCon
   syn name :: String
               
 sem ModuleName
@@ -36,8 +36,20 @@ sem QName
   | UnQual
      lhs.name = @name.name
   | Special
-     lhs.name = []
-                          
+     lhs.name = @specialcon.name
+
+sem SpecialCon
+  | UnitCon
+     lhs.name = "unit"
+  | ListCon
+     lhs.name = "List"
+  | FunCon	 
+     lhs.name = error "name: prefix function arrows not supported."
+  | TupleCon
+     lhs.name = error "name: prefix tuple type constructors not supported."
+  | Cons UnboxedSingleCon	 
+     lhs.name = error "name: unsupported."
+
 sem TyVarBind
   | KindedVar
      lhs.name = error "name: Unsupported construct."
