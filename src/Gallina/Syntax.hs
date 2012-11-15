@@ -81,7 +81,6 @@ data GallinaMatch =
 data GallinaPat =
   GallinaPVar String
   | GallinaPTuple [GallinaPat]
-  | GallinaPList [GallinaPat]
   | GallinaPApp String [GallinaPat]
   | GallinaPWildCard
   deriving (Show, Eq)
@@ -188,5 +187,4 @@ patVars :: GallinaPat -> [String]
 patVars (GallinaPVar s    ) = [s]
 patVars (GallinaPApp s ps ) = s : concatMap patVars ps
 patVars (GallinaPTuple ps ) = concatMap patVars ps
-patVars (GallinaPList ps  ) = concatMap patVars ps
 patVars GallinaPWildCard    = []

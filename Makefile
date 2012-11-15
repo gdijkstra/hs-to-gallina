@@ -1,7 +1,5 @@
 CABAL-CONFIGURE-FLAGS := --user
 CABAL-BUILD-FLAGS     :=
-TESTFILE=examples/ListTest.hs
-TESTFILEBN=$(basename $(TESTFILE))
 
 default : test
 
@@ -16,21 +14,18 @@ haskell : src/AG.hs
 	runhaskell Setup.hs configure $(CABAL-CONFIGURE-FLAGS)
 	runhaskell Setup.hs build $(CABAL-BUILD-FLAGS)
 
-test : all clean-coq-tmp prelude
-	@echo "Make: running program..."
-	./dist/build/HsToGallina/HsToGallina -w $(TESTFILE)
-	@echo "Make: running coqc..."
-	coqc -I examples $(TESTFILEBN).v
-	@if [ $$? -eq 0 ] ; then echo "Make: coqc run succesfully" ; else echo "Error: coqc run unsuccesfully"; fi
+test : all prelude
+	@echo "Make: running RunTests..."
+	./RunTests
+	@if [ $$? -eq 0 ] ; then echo "Make: RunTests run succesfully" ; else echo "Error: RunTests run unsuccesfully"; fi
 
-prelude: examples/Prelude.v
-	coqc examples/Prelude.v
+prelude: lib/Prelude.v
+	coqc lib/Prelude.v
 
-clean-coq-tmp:
-	rm examples/Prelude.glob examples/Prelude.vo
-	rm -f $(TESTFILEBN).glob $(TESTFILEBN).v $(TESTFILEBN).vo
+clean-prelude:
+	rm -f lib/Prelude.glob lib/Prelude.vo
 
-clean: clean-coq-tmp
+clean: clean-prelude
 	rm src/AG.hs 
 	runhaskell Setup.hs clean
 

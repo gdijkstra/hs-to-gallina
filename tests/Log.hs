@@ -1,19 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_Hs2Gallina bc: log #-}
 
-module BCExample where
+module Log where
 
--- "Prelude":
 data Nat = Zero
          | Succ Nat
 
-data List a = Nil
-            | Cons a (List a)
-
-data Bool = True
-          | False
-
--- From the Coq'art book:
 div2 :: Nat -> Nat
 div2 Zero = Zero
 div2 (Succ Zero) = Zero

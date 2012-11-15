@@ -1,0 +1,67 @@
+#!/bin/bash
+
+pushd tests
+
+echo "Removing all temporary files."
+rm -f *.glob *.v *.vo extracted/*
+
+# Test stuff that should work.
+positiveTests="Log.hs Quicksort.hs"
+success=0
+total=0
+
+for f in $positiveTests
+do
+    total=$(($total + 1))
+    echo "RunTests: running HsToGallina on $f."
+    ../dist/build/HsToGallina/HsToGallina -w $f
+    if [[ $? -eq 0 ]]
+    then 
+        echo "RunTests: running coqc on" $(basename $f .hs)
+        coqc -I ../lib/ $(basename $f .hs).v
+        if [[ $? -eq 0 ]]
+        then 
+            echo "RunTests: coqc run succesfully" 
+            ghc -c extracted/$f
+            if [[ $? -eq 0 ]]
+            then
+                echo "RunTests: ghc compiled extracted code succesfully"
+                success=$(($success + 1))
+            else
+                echo "Error: ghc failed."
+            fi
+        else echo "Error: coqc failed."
+        fi
+    else echo "Error: HsToGallina failed on $f."
+    fi
+done
+
+echo "RunTests: $success / $total tests succeeded."
+
+if (( $success == $total ))
+then exit 0
+else exit 1
+fi
+
+
+# Loop over files
+# Run Hs2Gallina
+# Run coqc
+# Run ghc
+# ghc -Wall -fno-warn-unrecognised-pragmas <haskell bestand>
+# Adjust counter if tests worked.
+# End loop
+
+# Print statistics.
+
+# Test stuff that should fail.
+
+# Loop over files
+# Run Hs2Gallina
+# Run coqc
+# Adjust counter if tests failed.
+# End loop
+
+# Print statistics.
+
+popd

@@ -35,6 +35,7 @@ instance Pp Vernacular where
               , text "Set Contextual Implicit."
               , vsep (map pp (moduleDefinitions a))
               , text "End" <+> text (moduleName a) <> char '.'
+              , text "Extraction \"extracted/" <> text (moduleName a) <> text ".hs\" " <> text (moduleName a) <> char '.'
               ]
 
 instance Pp GallinaUngroupedDefinition where
@@ -139,7 +140,6 @@ instance Pp GallinaPat where
   ppPrec _ (GallinaPVar s    ) = text s
   ppPrec p (GallinaPApp s ps ) = parensIf (p > 0 && not (null ps)) $ hsep (text s : map (ppPrec 1) ps)
   ppPrec _ (GallinaPTuple ps ) = char '(' <> (hcat . intersperse (text ", ") . map pp $ ps) <> char ')'
-  ppPrec _ (GallinaPList ps  ) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ps) <> char ']'
   ppPrec _ GallinaPWildCard    = text "_"
 
 instance Pp GallinaType where
@@ -162,6 +162,7 @@ instance Pp GallinaType where
                                                             , pp t2
                                                             ]
   ppPrec p (GallinaTyList t     ) = parensIf (p > 1) $ text "List" <+> ppPrec 2 t
+  ppPrec _ (GallinaTyListTerm []) = text "nil"
   ppPrec _ (GallinaTyListTerm ts) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
   ppPrec p (GallinaTyTuple ts   ) = parensIf (p > 0) $ hcat . intersperse (text " * ") . map (ppPrec 1) $ ts
 
@@ -190,6 +191,7 @@ instance Pp GallinaTerm where
                                         , text "else", pp f
                                         ]
   ppPrec _ (GallinaTyTerm ty    ) = ppPrec 2 ty
+  ppPrec _ (GallinaList []      ) = text "nil"
   ppPrec _ (GallinaList ts      ) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
   ppPrec _ (GallinaTuple ts     ) = char '(' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ')'
 

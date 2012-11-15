@@ -70,9 +70,14 @@ convertFile args = do
   res <- parseFile . filePath $ args
   case res of
     ParseOk m -> do
-      let output = ppVernacular . resVernacular . makeCoinductive . addImplicitArgumentsCommands . applyBoveCapretta . convertToGallina $ m
-      putStrLn output
-      forM_ (writePath $ args) (\outfp -> writeFile outfp output)
+      let output = ppVernacular
+                   . resVernacular
+                   . makeCoinductive
+                   . addImplicitArgumentsCommands
+                   . applyBoveCapretta
+                   . convertToGallina
+                   $ m
+      forM_ (writePath args) (\outfp -> writeFile outfp output)
     ParseFailed _ _ -> putStrLn "convertFile: Parsing Haskell file failed."
 
 main :: IO ()

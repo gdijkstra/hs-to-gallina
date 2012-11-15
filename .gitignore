@@ -11,3 +11,4 @@ dist/
 src/AG.hs
 /misc/Test.hs
 /misc/Occurs.hs
+/tests/extracted/*

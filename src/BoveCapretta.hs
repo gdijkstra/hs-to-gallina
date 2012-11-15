@@ -17,13 +17,14 @@ removeAnnotations = map removeAnnotations'
   where
     removeAnnotations' (GallinaPVarAnn var _ ) = GallinaPVar var
     removeAnnotations' (GallinaPAppAnn s args) = GallinaPApp s (map removeAnnotations' args)
+    removeAnnotations' (GallinaPTupleAnn s   ) = GallinaPTuple (map removeAnnotations' s)
 
 -- We won't treat mutually recursive functions and don't care about
 -- composition. If we want to use a function that has been defined
 -- using B-C method, then we pretend that it's already total. The user
 -- then still needs to provide the proof.
 applyBoveCapretta ::  Result -> Result
-applyBoveCapretta r = trace (show funs) $ r { resVernacular = v { moduleDefinitions = newDefinitions } }
+applyBoveCapretta r = r { resVernacular = v { moduleDefinitions = newDefinitions } }
   where
     funs = bcDefinitions r
     v = resVernacular r
@@ -38,7 +39,8 @@ tryApplyBC tycons specs funs def = case def of
   _                            -> [def]
   where
     apply d b f = if (funName b) `S.member` funs
-                  then concat [ [extractPredicate specs b]
+                  then trace (show b) $
+                       concat [ [extractPredicate specs b]
                               , extractNonTheorems tycons specs b
                               , extractInvTheorems specs b
                               , [f (transformFunction tycons specs b)]
@@ -52,16 +54,21 @@ type Specifications = Map String Specification
 type TypeConstructors = Map String [String]
 
 tyConstrAssocs :: Vernacular -> TypeConstructors
-tyConstrAssocs v = M.fromList . map toTyConstrAssoc . concat
+tyConstrAssocs v = M.fromList . (listTyConstrAssoc :) . map toTyConstrAssoc . concat
                  $ [is | (GallinaInductive is _) <- moduleDefinitions v]
   where
+    listTyConstrAssoc = ("list", ["nil", "cons"])
     toTyConstrAssoc :: GallinaInductiveBody -> (String, [String])
     toTyConstrAssoc i = (inductiveName i, map constrName (inductiveConstrs i))
 
 constrSpecsAssocs :: Vernacular -> Specifications
-constrSpecsAssocs v = M.fromList . concatMap (map toSpecAssoc . inductiveConstrs) . concat
+constrSpecsAssocs v = M.fromList . (listAssocs ++) . concatMap (map toSpecAssoc . inductiveConstrs) . concat
                     $ [is | (GallinaInductive is _) <- moduleDefinitions v]
   where
+    listAssocs :: [(String,Specification)]
+    listAssocs = [ ("nil", Spec [] (GallinaTyList (GallinaTyVar "a")))
+                 , ("cons", Spec [GallinaTyVar "a", GallinaTyList (GallinaTyVar "a")] (GallinaTyList (GallinaTyVar "a")))
+                 ]
     toSpecAssoc :: GallinaConstructor -> (String, Specification)
     toSpecAssoc c = (constrName c, constrSpec c)
     constrSpec :: GallinaConstructor -> Specification
@@ -150,12 +157,14 @@ extractContexts specs funspec pats =
 data GallinaPatAnnotated =
   GallinaPVarAnn String GallinaType
   | GallinaPAppAnn String [GallinaPatAnnotated]
+  | GallinaPTupleAnn [GallinaPatAnnotated]
     deriving (Show, Eq)
 
 annotatedPatsToContexts :: [GallinaPatAnnotated] -> [Context]
 annotatedPatsToContexts = map f
   where f (GallinaPVarAnn s ty) = [(s, ty)]
         f (GallinaPAppAnn _ ps) = concat $ annotatedPatsToContexts ps
+        f (GallinaPTupleAnn ps) = concat $ annotatedPatsToContexts ps
 
 -- Should initially be called with the specification of the function.
 annotatePats :: Specifications -> Specification
@@ -163,11 +172,13 @@ annotatePats :: Specifications -> Specification
 annotatePats specs (Spec args _) pats = zipWith ann pats args
   where
     ann :: GallinaPat -> GallinaType -> GallinaPatAnnotated
+    ann (GallinaPTuple s ) (GallinaTyTuple tys) = GallinaPTupleAnn $ zipWith ann s tys
     ann (GallinaPVar s   ) ty = GallinaPVarAnn s ty
     ann (GallinaPApp c ps) ty = case M.lookup c specs of
       Nothing -> error $ "annotatePats: could not find spec of constr: " ++ show c
       Just spec -> GallinaPAppAnn c (annotatePats specs (substituteSpec spec ty) ps)
     ann GallinaPWildCard _ = error "annotatePats: Wildcards unsupported."
+    ann _ _ = error "annotatePats: pattern is not well-typed."
 
 substituteSpec :: Specification -> GallinaType -> Specification
 substituteSpec (Spec args res) ty = Spec (map subst args) (subst res)
@@ -197,6 +208,7 @@ unifyTypes (GallinaTyCon s1 ) (GallinaTyCon s2 ) = if s1 /= s2
                                               then error "unifyTypes: impossible happened"
                                               else id
 unifyTypes (GallinaTyVar a)   r                  = mkTySubst a r
+unifyTypes (GallinaTyList a)  (GallinaTyList b ) = unifyTypes a b
 unifyTypes l                  r                  =
   error $ "unifyTypes: unsupported: " ++ show l ++ " ~> " ++ show r
 
@@ -221,11 +233,14 @@ termToType (GallinaApp l r) = GallinaTyApp (termToType l) (termToType r)
 termToType _                = error "termToType: only var and app supported."
 
 collectArgs :: GallinaTerm -> [(String, [GallinaTerm])]
-collectArgs t = collectArgs' t True []
+collectArgs t = collectArgs' t False []
   where
     collectArgs' :: GallinaTerm -> Bool -> [GallinaTerm] -> [(String, [GallinaTerm])]
     collectArgs' (GallinaVar s  ) l args = if l
                                            then [(s, reverse args)]
+                                           else []
+    collectArgs' (GallinaList xs) l args = if l
+                                           then undefined -- TODO: dit
                                            else []
     collectArgs' (GallinaApp l r) _ args = collectArgs' l True (args ++ [r])
                                            ++ collectArgs' r False []
@@ -240,7 +255,6 @@ resultType fun pats = foldl1 GallinaTyApp $ GallinaTyCon (predicateName fun) : m
 
 patternToType :: GallinaPat -> GallinaType
 patternToType (GallinaPTuple ps ) = GallinaTyTuple . map patternToType $ ps
-patternToType (GallinaPList ps  ) = GallinaTyListTerm . map patternToType $ ps
 patternToType (GallinaPVar s    ) = GallinaTyVar s
 patternToType (GallinaPApp s ps ) = foldl GallinaTyApp (GallinaTyCon s)
                                     . map patternToType $ ps
@@ -359,12 +373,15 @@ unifyMultiPats l r = fmap (foldr Compose IdSubst)
 -- multipattern occurs exactly once.
 unifyPatAnn :: GallinaPatAnnotated -> GallinaPatAnnotated -> Maybe MultiPatSubst
 unifyPatAnn (GallinaPVarAnn v t   ) p = Just $ Subst v t p
-unifyPatAnn (GallinaPAppAnn _ _   ) (GallinaPVarAnn _ _) = Nothing
 unifyPatAnn (GallinaPAppAnn c0 ps0) (GallinaPAppAnn c1 ps1)
   | c0 /= c1 = Nothing
   | otherwise = do
     substs <- sequence . map (uncurry unifyPatAnn) $ zip ps0 ps1
     return . foldr Compose IdSubst $ substs
+unifyPatAnn (GallinaPTupleAnn ps0 ) (GallinaPTupleAnn ps1) = do
+  substs <- sequence . map (uncurry unifyPatAnn) $ zip ps0 ps1
+  return . foldr Compose IdSubst $ substs
+unifyPatAnn _                       _                      = Nothing
 
 applyMultiPatSubst :: MultiPatSubst -> MultiPattern -> MultiPattern
 applyMultiPatSubst = map . applyPatSubst
@@ -378,13 +395,16 @@ applyPatSubst (Subst var _ pat) = applySubst var pat
     applySubst v0 pat0 (GallinaPAppAnn constr pats) = GallinaPAppAnn constr
                                                       . map (applySubst v0 pat0)
                                                       $ pats
+    applySubst v0 pat0 (GallinaPTupleAnn pats     ) = GallinaPTupleAnn
+                                                      . map (applySubst v0 pat0)
+                                                      $ pats
 
 -- Returns Nothing if the substs only rename variables to variables.
 -- Return Just x where x is a variable mapped to a non-variable.
 hasNonRenaming :: MultiPatSubst -> Maybe (String, GallinaType)
 hasNonRenaming IdSubst                          = Nothing
-hasNonRenaming (Subst s t (GallinaPAppAnn _ _)) = Just (s, t)
 hasNonRenaming (Subst _ _ (GallinaPVarAnn _ _)) = Nothing
+hasNonRenaming (Subst s t _                   ) = Just (s, t)
 hasNonRenaming (Compose l r                   ) = hasNonRenaming l
                                                   `mplus` hasNonRenaming r
 
@@ -409,8 +429,8 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
 
 getTypeConstr :: GallinaType -> String
 getTypeConstr (GallinaTyListTerm _ ) = error "getTypeConstr: lists not supported."
-getTypeConstr (GallinaTyTuple _    ) = "*"
-getTypeConstr (GallinaTyList _     ) = "List"
+getTypeConstr (GallinaTyTuple s    ) = "* " ++ show (length s) -- urgh
+getTypeConstr (GallinaTyList _     ) = "list"
 getTypeConstr (GallinaTyApp l _    ) = getTypeConstr l
 getTypeConstr (GallinaTyCon c      ) = c
 getTypeConstr (GallinaTyForall _ _ ) = error "getTypeConstr: foralls not supported."
@@ -429,12 +449,12 @@ maybeTuple (a, Just b ) = return (a, b)
 splitVar :: TypeConstructors -> Specifications -> GallinaType -> Int -> String -> MultiPattern -> [MultiPattern]
 splitVar tycons specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) substs where
   substs = map (Subst var ty) pats
-  pats = fromJust $ do
+  pats = fromJust $ trace ("meh: " ++ show pats') $ pats'
+  pats' = do
     constrNames <- M.lookup (getTypeConstr ty) tycons
     constrSpecs <- mapM (\v -> maybeTuple (v, M.lookup v specs)) constrNames
     let actualSpecs = map (second (flip substituteSpec ty)) constrSpecs
     return . map (uncurry mkPat) $ actualSpecs
-
   mkPat c (Spec args _) = GallinaPAppAnn c $ zipWith (\t m -> GallinaPVarAnn ("_p" ++ show n ++ "x" ++ show m) t) args ([0..] :: [Int])
 
 -- Manipulate terms
@@ -467,7 +487,7 @@ manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
       where
         (l', n' ,b) = count' n l False
         (r', n'',_) = count' n' r True
-    count' _ _ _ = error "manipulateTerm: cannot manipulate terms that contain something other than applications or variables."
+    count' n t b = trace "manipulateTerm: cannot manipulate terms that contain something other than applications or variables." $ (t, n, b)
     term' n = foldl1 GallinaApp (GallinaVar (invThm n) : map GallinaVar args)
     eqArgs = map (\n -> "_h" ++ show n) [0 .. arity - 1]
     args = ('x' : show arity) : eqArgs

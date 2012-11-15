@@ -1,0 +1,256 @@
+-- This file contains all the prelude stuff we want to support, eventually.
+
+-- Left out:
+
+-- * Everything that has to do with classes.
+-- * seq, ($!)
+-- * Char, String.
+-- * IO
+-- * Int and all other number stuff (because of classes).
+-- * lines, words, unlines, unwords (because of String).
+-- * lookup, elem, notElem (because of Eq class).
+-- * PreludeText/PreludeIO
+-- * Might not terminate: until.
+-- * Never terminates in a strict, lfp setting: cycle, iterate, repeat. 
+
+-- Needs further pondering:
+-- * Ordering data type.
+-- * error/undefined. We don't want this by definition of the problem we are trying to solve?
+-- * until
+-- * head, tail, last, init, (!!): how to deal with partiality?
+-- * (!!), take, drop, replicate, splitAt: how to deal with ints?
+
+infixr 9  .
+infixr 3  &&
+infixr 2  ||
+infixr 0  $
+
+id               :: a -> a
+id x             =  x
+
+const            :: a -> b -> a
+const x _        =  x
+
+(.)              :: (b -> c) -> (a -> b) -> a -> c
+f . g            =  \ x -> f (g x)
+
+flip             :: (a -> b -> c) -> b -> a -> c
+flip f x y       =  f y x
+
+($) :: (a -> b) -> a -> b
+f $  x    =  f x
+
+data  Bool  =  False | True
+
+(&&), (||)       :: Bool -> Bool -> Bool
+True  && x       =  x
+False && _       =  False
+True  || _       =  True
+False || x       =  x
+                                        
+not              :: Bool -> Bool
+not True         =  False
+not False        =  True
+
+otherwise        :: Bool
+otherwise        =  True
+
+data  Maybe a  =  Nothing | Just a
+
+maybe              :: b -> (a -> b) -> Maybe a -> b
+maybe n f Nothing  =  n
+maybe n f (Just x) =  f x
+
+data  Either a b  =  Left a | Right b
+
+either               :: (a -> c) -> (b -> c) -> Either a b -> c
+either f g (Left x)  =  f x
+either f g (Right y) =  g y
+
+data  Ordering  =  LT | EQ | GT
+
+data  [a]  =  [] | a : [a]
+
+data  (a,b)   =  (a,b)
+
+data  (a,b,c) =  (a,b,c)
+
+fst              :: (a,b) -> a
+fst (x,y)        =  x
+
+snd              :: (a,b) -> b
+snd (x,y)        =  y
+
+curry            :: ((a, b) -> c) -> a -> b -> c
+curry f x y      =  f (x, y)
+
+uncurry          :: (a -> b -> c) -> ((a, b) -> c)
+uncurry f p      =  f (fst p) (snd p)
+
+error            :: String -> a
+error            =  primError
+
+undefined        :: a
+undefined        =  error "Prelude.undefined"
+
+infixl 9  !!
+infixr 5  ++
+infix  4  `elem`, `notElem`
+
+map :: (a -> b) -> [a] -> [b]
+map f []     = []
+map f (x:xs) = f x : map f xs
+
+(++) :: [a] -> [a] -> [a]
+[]     ++ ys = ys
+(x:xs) ++ ys = x : (xs ++ ys)
+
+filter :: (a -> Bool) -> [a] -> [a]
+filter p []                 = []
+filter p (x:xs) | p x       = x : filter p xs
+                | otherwise = filter p xs
+
+concat :: [[a]] -> [a]
+concat xss = foldr (++) [] xss
+
+concatMap :: (a -> [b]) -> [a] -> [b]
+concatMap f = concat . map f
+
+head             :: [a] -> a
+head (x:_)       =  x
+head []          =  error "Prelude.head: empty list"
+
+tail             :: [a] -> [a]
+tail (_:xs)      =  xs
+tail []          =  error "Prelude.tail: empty list"
+
+last             :: [a] -> a
+last [x]         =  x
+last (_:xs)      =  last xs
+last []          =  error "Prelude.last: empty list"
+
+init             :: [a] -> [a]
+init [x]         =  []
+init (x:xs)      =  x : init xs
+init []          =  error "Prelude.init: empty list"
+
+null             :: [a] -> Bool
+null []          =  True
+null (_:_)       =  False
+
+length           :: [a] -> Int
+length []        =  0
+length (_:l)     =  1 + length l
+
+(!!)                :: [a] -> Int -> a
+xs     !! n | n < 0 =  error "Prelude.!!: negative index"
+[]     !! _         =  error "Prelude.!!: index too large"
+(x:_)  !! 0         =  x
+(_:xs) !! n         =  xs !! (n-1)
+
+foldl            :: (a -> b -> a) -> a -> [b] -> a
+foldl f z []     =  z
+foldl f z (x:xs) =  foldl f (f z x) xs
+
+foldl1           :: (a -> a -> a) -> [a] -> a
+foldl1 f (x:xs)  =  foldl f x xs
+foldl1 _ []      =  error "Prelude.foldl1: empty list"
+
+scanl            :: (a -> b -> a) -> a -> [b] -> [a]
+scanl f q xs     =  q : (case xs of
+                            []   -> []
+                            x:xs -> scanl f (f q x) xs)
+
+scanl1           :: (a -> a -> a) -> [a] -> [a]
+scanl1 f (x:xs)  =  scanl f x xs
+scanl1 _ []      =  []
+
+foldr            :: (a -> b -> b) -> b -> [a] -> b
+foldr f z []     =  z
+foldr f z (x:xs) =  f x (foldr f z xs)
+
+foldr1           :: (a -> a -> a) -> [a] -> a
+foldr1 f [x]     =  x
+foldr1 f (x:xs)  =  f x (foldr1 f xs)
+foldr1 _ []      =  error "Prelude.foldr1: empty list"
+
+scanr             :: (a -> b -> b) -> b -> [a] -> [b]
+scanr f q0 []     =  [q0]
+scanr f q0 (x:xs) =  f x q : qs
+                     where qs@(q:_) = scanr f q0 xs 
+
+scanr1          :: (a -> a -> a) -> [a] -> [a]
+scanr1 f []     =  []
+scanr1 f [x]    =  [x]
+scanr1 f (x:xs) =  f x q : qs
+                   where qs@(q:_) = scanr1 f xs 
+
+replicate        :: Int -> a -> [a]
+replicate n x    =  take n (repeat x)
+
+take                   :: Int -> [a] -> [a]
+take n _      | n <= 0 =  []
+take _ []              =  []
+take n (x:xs)          =  x : take (n-1) xs
+
+drop                   :: Int -> [a] -> [a]
+drop n xs     | n <= 0 =  xs
+drop _ []              =  []
+drop n (_:xs)          =  drop (n-1) xs
+
+splitAt                  :: Int -> [a] -> ([a],[a])
+splitAt n xs             =  (take n xs, drop n xs)
+
+takeWhile               :: (a -> Bool) -> [a] -> [a]
+takeWhile p []          =  []
+takeWhile p (x:xs) 
+            | p x       =  x : takeWhile p xs
+            | otherwise =  []
+
+dropWhile               :: (a -> Bool) -> [a] -> [a]
+dropWhile p []          =  []
+dropWhile p xs@(x:xs')
+            | p x       =  dropWhile p xs'
+            | otherwise =  xs
+
+span, break             :: (a -> Bool) -> [a] -> ([a],[a])
+span p []            = ([],[])
+span p xs@(x:xs') 
+            | p x       =  (x:ys,zs) 
+            | otherwise =  ([],xs)
+                           where (ys,zs) = span p xs'
+
+break p                 =  span (not . p)
+
+reverse          :: [a] -> [a]
+reverse          =  foldl (flip (:)) []
+
+and, or          :: [Bool] -> Bool
+and              =  foldr (&&) True
+or               =  foldr (||) False
+
+any, all         :: (a -> Bool) -> [a] -> Bool
+any p            =  or . map p
+all p            =  and . map p
+
+zip              :: [a] -> [b] -> [(a,b)]
+zip              =  zipWith (,)
+
+zip3             :: [a] -> [b] -> [c] -> [(a,b,c)]
+zip3             =  zipWith3 (,,)
+
+zipWith          :: (a->b->c) -> [a]->[b]->[c]
+zipWith z (a:as) (b:bs)
+                 =  z a b : zipWith z as bs
+zipWith _ _ _    =  []
+
+zipWith3         :: (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith3 z (a:as) (b:bs) (c:cs)
+                 =  z a b c : zipWith3 z as bs cs
+zipWith3 _ _ _ _ =  []
+
+unzip            :: [(a,b)] -> ([a],[b])
+unzip            =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
+
+unzip3           :: [(a,b,c)] -> ([a],[b],[c])
+unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
