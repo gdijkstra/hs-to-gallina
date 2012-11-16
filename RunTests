@@ -14,7 +14,7 @@ for f in $positiveTests
 do
     total=$(($total + 1))
     echo "RunTests: running HsToGallina on $f."
-    ../dist/build/HsToGallina/HsToGallina -w $f
+    ../dist/build/HsToGallina/HsToGallina -f $f -w
     if [[ $? -eq 0 ]]
     then 
         echo "RunTests: running coqc on" $(basename $f .hs)
