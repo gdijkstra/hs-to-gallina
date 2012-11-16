@@ -25,12 +25,6 @@ sem Decl
 attr BangTypes QualConDecls QualConDecl ConDecl
   inh dataName :: GallinaType -- Needed for types of constructors
 
-{
-ppParams :: [String] -> String
-ppParams [] = ""
-ppParams xs@(_:_) = ' ' : unwords xs
-}
-
 sem Decl
   | DataDecl
      qualcondecls.dataName = foldl GallinaTyApp (GallinaTyCon @name.name)

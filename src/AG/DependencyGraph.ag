@@ -60,10 +60,12 @@ sem Exp
   | List
      lhs.dependencies = @exps.dependencies
   | InfixApp
-     lhs.dependencies = @exp.dependencies ++ @qop.dependencies ++ @exp1.dependencies
+     lhs.dependencies = concat [@exp.dependencies, @qop.dependencies, @exp1.dependencies]
   | Tuple
      lhs.dependencies = @exps.dependencies
-  | NegApp IPVar If Do MDo TupleSection BracketExp
+  | If
+     lhs.dependencies = concat [@exp.dependencies, @exp1.dependencies, @exp2.dependencies]
+  | NegApp IPVar Do MDo TupleSection BracketExp
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote SpliceExp QuasiQuote XTag XETag XPcdata XExpTag

@@ -5,7 +5,26 @@ author: Gabe Dijkstra
 maintainer: G.Dijkstra@uu.nl
 build-type: Simple
 cabal-version: >= 1.2
-extra-source-files: Makefile, README.md
+extra-source-files: Makefile
+                    , README.md
+                    , RunTests
+                    , src/AG.ag
+                    , src/AG/DataTypes.ag
+                    , src/AG/Declarations.ag
+                    , src/AG/DependencyGraph.ag
+                    , src/AG/Pragmas.ag
+                    , src/AG/Syntax.ag
+                    , src/AG/Terms.ag
+                    , src/AG/TypeSynonyms.ag
+                    , src/AG/Types.ag
+                    , src/AG/Util.ag
+                    , src/AG/Vernacular.ag
+                    , src/BoveCapretta.hs
+                    , src/Gallina/PrettyPrinting.hs
+                    , src/Gallina/Syntax.hs
+                    , src/HsToGallina.hs
+                    , tests/Log.hs
+                    , tests/Quicksort.hs
 
 executable HsToGallina
   main-is: HsToGallina.hs

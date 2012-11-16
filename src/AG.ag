@@ -25,13 +25,20 @@ include "AG/Util.ag"
 include "AG/Pragmas.ag"
 
 {
+-- | Data type storing the result of convert the Haskell AST to a Coq
+-- AST.
 data Result = 
   Result
-  { resVernacular :: Vernacular
-  , bcDefinitions :: Set String
-  , coDefinitions :: Set String
+  { resVernacular :: VernacularDocument -- ^ Contains the module name and AST of its body.
+  , bcDefinitions :: Set String         -- ^ All the definitions on which we should apply the Bove-Capretta method.
+  , coDefinitions :: Set String         -- ^ All the definitions that should be read coinductively.
   }
 
+-- | Convert the Haskell AST to a Coq AST and store some extra
+-- information we got from the Haskell pragmas. Note that after this
+-- step we didn't do any ordering of definitions and other
+-- transformations. The result will therefore most likely not be valid
+-- Gallina code.
 convertToGallina :: Module -> Result
 convertToGallina m = result_Syn_Module $ wrap_Module (sem_Module m) $ Inh_Module
 }

@@ -11,11 +11,15 @@ attr Decl
   syn declsDeps :: {[(GallinaUngroupedDefinition, String, [String])]}
 
 {
+-- | Make an ungrouped function definition, given a name, arity, type
+-- and a body.
 mkFunDefDecl :: String -> Int -> Maybe GallinaType -> [GallinaMatch] -> GallinaUngroupedDefinition
 mkFunDefDecl name arity t ms = GallinaUngroupedFunOrPat . Left $ 
                                GallinaFunctionBody arity name t (GallinaCase mkTerms ms)
   where mkTerms = map (\n -> GallinaVar ('x' : show n)) [0 .. (arity - 1)]
 
+-- | Make an ungrouped pattern binding definition, given a name, a
+-- type and a body.
 mkPatBindDefDecl :: String -> Maybe GallinaType -> GallinaTerm -> GallinaUngroupedDefinition     
 mkPatBindDefDecl name t body = GallinaUngroupedFunOrPat . Right $
                                GallinaPatBindingBody name t body

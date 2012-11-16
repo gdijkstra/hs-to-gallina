@@ -1,47 +1,55 @@
+-- | Pretty printer for Gallina code and Coq VernacularDocument commands.
 module Gallina.PrettyPrinting where
 
-import           Data.List
+import           Data.List        (intersperse)
 import           Gallina.Syntax
 import           Text.PrettyPrint
 
+-- | Pretty printing class.
 class Pp a where
-  pp     :: a -> Doc
-  ppPrec :: Int -> a -> Doc
+  pp     :: a -> Doc       -- ^ Pretty print something.
+  ppPrec :: Int -> a -> Doc -- ^ Pretty print according to the precedence context given.
 
   pp       = ppPrec 0
   ppPrec _ = pp
 
+-- | Enclose something in parentheses if the boolean value equals @True@.
 parensIf :: Bool -> Doc -> Doc
 parensIf b = if b then parens else id
 
+-- | Intersperse commas and concatenate the result horizontally.
 commas :: [Doc] -> Doc
-commas = hsep . intersperse (text ",")
+commas = hcat . intersperse (text ", ")
 
+-- | Concatenate the elements of the list vertically with an empty
+-- line separating every element.
 vsep :: [Doc] -> Doc
 vsep = vcat . intersperse (text "")
 
-ppVernacular :: Vernacular -> String
-ppVernacular = render . pp
+-- | Pretty print the whole 'VernacularDocument' document and render the
+-- result to a 'String'.
+ppVernacularDocument :: VernacularDocument -> String
+ppVernacularDocument = render . pp
 
+-- | TODO: this should be removed.
 ppGroup :: (Pp a) => String -> [a] -> Doc
 ppGroup name is = text name <+> vcat (intersperse (text "with") . map pp $ is)
 
+-- | Group a bunch of definitions and intersperse them with the
+-- keyword @\"with\"@. Used for mutually recursive definitions.
 ppGroupDotted :: (Pp a) => String -> [a] -> Doc
 ppGroupDotted name is = ppGroup name is <> char '.'
 
-instance Pp Vernacular where
-  pp a = vsep [text "Module" <+> text (moduleName a) <> char '.'
+instance Pp VernacularDocument where
+  pp a = vsep [text "Module" <+> text (documentName a) <> char '.'
               , text "Require Import Prelude."
               , text "Set Contextual Implicit."
-              , vsep (map pp (moduleDefinitions a))
-              , text "End" <+> text (moduleName a) <> char '.'
-              , text "Extraction \"extracted/" <> text (moduleName a) <> text ".hs\" " <> text (moduleName a) <> char '.'
+              , vsep (map pp (documentCommands a))
+              , text "End" <+> text (documentName a) <> char '.'
+              , text "Extraction \"extracted/" <> text (documentName a) <> text ".hs\" " <> text (documentName a) <> char '.'
               ]
 
-instance Pp GallinaUngroupedDefinition where
-  pp a = text "Ungrouped" <> pp a
-
-instance Pp GallinaDefinition where
+instance Pp VernacularCommand where
   pp (GallinaInductive is False) = ppGroupDotted "Inductive" is
   pp (GallinaInductive is True) = ppGroupDotted "CoInductive" is
   pp (GallinaFixpoint is False) = ppGroupDotted "Fixpoint" is
@@ -79,7 +87,9 @@ instance Pp GallinaConstructor where
               , pp (constrType a)
               ]
 
-ppArg :: (Pp a) => Maybe a -> Int -> Doc
+-- | Print an argument with its number and, optionally its type as
+-- well.
+ppArg :: Maybe GallinaType -> Int -> Doc
 ppArg Nothing  no = text ('x' : show no)
 ppArg (Just t) no = parens . hsep $ [text ('x' : show no), text ":", pp t]
 

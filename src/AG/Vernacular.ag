@@ -2,9 +2,19 @@
 -- out of it.
 
 {
+data GallinaUngroupedDefinition =
+  GallinaUngroupedInd GallinaInductiveBody
+  | GallinaUngroupedFunOrPat FunOrPatBody
+  deriving (Show, Eq)
+
 type DeclDeps =  [(GallinaUngroupedDefinition, String, [String])]
 
-groupDefinitions :: SCC GallinaUngroupedDefinition -> GallinaDefinition
+-- | Group the definitions using the strongly connected components of
+-- the dependency graph. It will raise an error if we have a data type
+-- that is mutually recursive with something that's not a data
+-- type. It will also raise an error when we have a 'CyclicSCC' with
+-- an empty list, which should never happen.
+groupDefinitions :: SCC GallinaUngroupedDefinition -> VernacularCommand
 groupDefinitions (AcyclicSCC x) = toDef x
   where
     toDef (GallinaUngroupedInd b              ) = GallinaInductive [b] False
@@ -20,15 +30,13 @@ groupDefinitions (CyclicSCC is@((GallinaUngroupedFunOrPat _):_)) = GallinaFixpoi
     toFix _ = error "groupDefinitions: toFix: argument must be a function or pattern binding."
 groupDefinitions (CyclicSCC []) = error "groupDefinitions: CyclicSCC should have non-empty list argument."
 
+-- | Fetch the definition name of an ungrouped definition.
 declName :: GallinaUngroupedDefinition -> String
 declName (GallinaUngroupedInd b              ) = inductiveName b
 declName (GallinaUngroupedFunOrPat (Left b)  ) = funName b
 declName (GallinaUngroupedFunOrPat (Right b) ) = patName b
 
-ppSCC :: SCC GallinaUngroupedDefinition -> String
-ppSCC (AcyclicSCC v) = "non-recursive: " ++ declName v
-ppSCC (CyclicSCC vs) = "recursive: " ++ (intercalate ", " . map declName $ vs)
-
+-- | Extract the dependencies from a type.
 typeDeps :: GallinaType -> [String]
 typeDeps (GallinaTyListTerm ts   ) = concatMap typeDeps ts
 typeDeps (GallinaTyTuple ts      ) = concatMap typeDeps ts
@@ -43,6 +51,10 @@ typeDeps (GallinaTyCon v         ) = [v]
 typeDeps (GallinaTySet           ) = []
 typeDeps (GallinaTyProp          ) = []
 
+-- | Associate all the ungrouped definitions with their types and add
+-- the dependencies induced by that type. Raises an error if it cannot
+-- find a type, which will happen if we do not have explicit type
+-- signatures for every top-level definition.
 associateTypes :: Map String GallinaType -> DeclDeps -> DeclDeps 
 associateTypes types declDeps = map f declDeps
   where
@@ -64,20 +76,25 @@ associateTypes types declDeps = map f declDeps
       Nothing -> error $ "ty: could not find type of " ++ show n
       (Just t) -> t
 
+-- | Associate the dependencies on constructor names with the
+-- corresponding data type.
 associateConstrs :: Map String String -> DeclDeps -> DeclDeps
 associateConstrs constrMap declDeps = map (third (associate constrMap)) declDeps
 
 associate :: Map String String -> [String] -> [String]
 associate constrMap names = map (\x -> M.findWithDefault x x constrMap) names
 
-mkVernacular :: Map String GallinaType -> Map String String -> String -> DeclDeps -> Vernacular
+-- | Associate the types with the ungrouped definitions, associate the
+-- constructors with the name of their types and group/sort the
+-- definitions according to the dependency graph.
+mkVernacular :: Map String GallinaType -> Map String String -> String -> DeclDeps -> VernacularDocument
 mkVernacular types constrMap name ungroupedDefs =
   let typedDefs = associateTypes types . associateConstrs constrMap $ ungroupedDefs
       sccs = stronglyConnComp typedDefs
       groupedDefs = map groupDefinitions sccs
-  in Vernacular { moduleName = name
-                , moduleDefinitions = groupedDefs
-                }
+  in VernacularDocument { documentName     = name
+                        , documentCommands = groupedDefs
+                        }
 }
 
 attr Module
@@ -114,6 +131,9 @@ sem Decl
      lhs.constrAssocs = []
 
 {
+-- | Group the definitions in lets/wheres. We will raise an error if
+-- we encounter a data type definition (which should be impossible) or
+-- when we have mutually recursive definitions.
 groupLetDefinitions :: DeclDeps -> [GallinaLetDefinition]
 groupLetDefinitions = map groupLetDefinition . stronglyConnComp
   where

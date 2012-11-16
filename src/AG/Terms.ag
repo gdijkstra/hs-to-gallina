@@ -51,12 +51,6 @@ sem Pat
      lhs.gallinaPat = error "unsupported pattern"
      lhs.var = error "unsupported pattern in lambda"
 
-{
-patToString :: GallinaPat -> String
-patToString (GallinaPVar s) = s
-patToString _ = error "patToString: not a pat var."
-}
-
 attr QName SpecialCon
   syn gallinaPatName :: String
 
@@ -78,6 +72,7 @@ sem SpecialCon
 
 -- Pattern matching
 {
+-- | Attach a list of lets to a single term by nesting the lets.
 attachBindings :: GallinaTerm -> [GallinaLetDefinition] -> GallinaTerm
 attachBindings t []       = t
 attachBindings t bs@(_:_) = GallinaLet bs t

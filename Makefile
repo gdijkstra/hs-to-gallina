@@ -9,9 +9,11 @@ src/AG.hs : src/AG.ag src/AG/*.ag
 	@echo "Make: running uuagc..."
 	uuagc -Hcfws --self --optimize -P src src/AG.ag
 
-haskell : src/AG.hs
-	@echo "Make: running cabal"
+configure: 
 	runhaskell Setup.hs configure $(CABAL-CONFIGURE-FLAGS)
+
+haskell : src/AG.hs configure
+	@echo "Make: running cabal"
 	runhaskell Setup.hs build $(CABAL-BUILD-FLAGS)
 
 test : all prelude
@@ -29,3 +31,5 @@ clean: clean-prelude
 	rm src/AG.hs 
 	runhaskell Setup.hs clean
 
+haddock: configure
+	runhaskell Setup.hs haddock --executable

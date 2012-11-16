@@ -16,6 +16,16 @@ sem ModulePragmas
      lhs.coDefs = @tl.coDefs `S.union` @hd.coDefs
 
 {
+-- | Parse an options pragma starting with the first string argument. Examples:
+-- @
+-- checkParsePragma "bc:" "bc: foo bar fooBar" (Just (UnknownTool "Hs2Gallina"))
+-- @
+-- yields something like:
+-- @
+-- Set.fromList ["bar", "foo", "fooBar"]
+-- @
+-- If the input string does not start with the given pragma string,
+-- then it will be ignored, i.e. the empty set will be returned.
 checkParsePragma :: String -> String -> Maybe Tool -> Set String
 checkParsePragma pragma inp (Just (UnknownTool "Hs2Gallina")) = case words inp of
   p : xs -> if p == pragma then S.fromList xs else S.empty
