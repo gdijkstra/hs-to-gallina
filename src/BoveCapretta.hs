@@ -133,7 +133,7 @@ predicateName fun = funName fun ++ "_acc"
 extractConstructor ::
   Specifications -> GallinaFunctionBody -> GallinaMatch -> Int -> GallinaConstructor
 extractConstructor specs fun match n =
-  GallinaConstructor { constrName = predicateName fun ++ "_" ++ show i
+  GallinaConstructor { constrName = predicateName fun ++ "_" ++ show n
                      , constrType = extractType specs fun match
                      }
 
