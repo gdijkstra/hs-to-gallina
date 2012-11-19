@@ -12,13 +12,17 @@ import qualified Data.Set            as S
 import           Debug.Trace         (trace)
 import           Gallina.Syntax
 
--- | Remove the type annotations from a multipattern.
-removeAnnotations :: MultiPattern -> [GallinaPat]
-removeAnnotations = map removeAnnotations'
-  where
-    removeAnnotations' (GallinaPVarAnn var _ ) = GallinaPVar var
-    removeAnnotations' (GallinaPAppAnn s args) = GallinaPApp s (map removeAnnotations' args)
-    removeAnnotations' (GallinaPTupleAnn s   ) = GallinaPTuple (map removeAnnotations' s)
+-- | Specification of a data constructor/function: the types of its
+-- arguments and the resulting type.
+data Specification = Spec [GallinaType] GallinaType
+                   deriving Show
+
+-- | Mapping from data constructor name to its specification.
+type Specifications = Map String Specification
+
+-- | Mapping from type constructor name to the names of its data
+-- constructors.
+type TypeConstructors = Map String [String]
 
 -- | Apply the Bove-Capretta method to the definitions as specified in
 -- the pragmas.
@@ -27,9 +31,29 @@ applyBoveCapretta r = r { resVernacular = v { documentCommands = newDefinitions 
   where
     funs = bcDefinitions r
     v = resVernacular r
-    specs = constrSpecsAssocs v
-    tycons = tyConstrAssocs v
     newDefinitions = concatMap (tryApplyBC tycons specs funs) (documentCommands . resVernacular $ r)
+
+    tycons :: TypeConstructors
+    tycons = M.fromList . (listTyConstrAssoc :) . map toTyConstrAssoc . concat
+                 $ [is | (GallinaInductive is _) <- documentCommands v]
+      where
+        listTyConstrAssoc = ("list", ["nil", "cons"])
+        toTyConstrAssoc :: GallinaInductiveBody -> (String, [String])
+        toTyConstrAssoc i = (inductiveName i, map constrName (inductiveConstrs i))
+
+    specs :: Specifications
+    specs = M.fromList . (listAssocs ++) . concatMap (map toSpecAssoc . inductiveConstrs) . concat
+                    $ [is | (GallinaInductive is _) <- documentCommands v]
+      where
+        listAssocs :: [(String,Specification)]
+        listAssocs = [ ("nil", Spec [] (GallinaTyList (GallinaTyVar "a")))
+                     , ("cons", Spec [GallinaTyVar "a", GallinaTyList (GallinaTyVar "a")] (GallinaTyList (GallinaTyVar "a")))
+                     ]
+        toSpecAssoc :: GallinaConstructor -> (String, Specification)
+        toSpecAssoc c = (constrName c, constrSpec c)
+        constrSpec :: GallinaConstructor -> Specification
+        constrSpec c = let flat = flatTy . constrType $ c
+                       in Spec (init flat) (last flat)
 
 -- | Try to apply the Bove-Capretta method to a definition, given the
 -- information about type and data constructors and which definitions
@@ -51,41 +75,6 @@ tryApplyBC tycons specs funs def = case def of
                               ]
                   else [d]
 
--- | Specification of a data constructor: the types of its arguments
--- and the resulting type.
-data Specification = Spec [GallinaType] GallinaType
-                   deriving Show
--- | Mapping from data constructor name to its specification.
-type Specifications = Map String Specification
--- | Mapping from type constructor name to the names of its data
--- constructors.
-type TypeConstructors = Map String [String]
-
--- | Extract the type constructor to data constructor mapping from a
--- 'VernacularDocument'.
-tyConstrAssocs :: VernacularDocument -> TypeConstructors
-tyConstrAssocs v = M.fromList . (listTyConstrAssoc :) . map toTyConstrAssoc . concat
-                 $ [is | (GallinaInductive is _) <- documentCommands v]
-  where
-    listTyConstrAssoc = ("list", ["nil", "cons"])
-    toTyConstrAssoc :: GallinaInductiveBody -> (String, [String])
-    toTyConstrAssoc i = (inductiveName i, map constrName (inductiveConstrs i))
-
--- | Extract the data constructor to specification mapping from a
--- 'VernacularDocument'.
-constrSpecsAssocs :: VernacularDocument -> Specifications
-constrSpecsAssocs v = M.fromList . (listAssocs ++) . concatMap (map toSpecAssoc . inductiveConstrs) . concat
-                    $ [is | (GallinaInductive is _) <- documentCommands v]
-  where
-    listAssocs :: [(String,Specification)]
-    listAssocs = [ ("nil", Spec [] (GallinaTyList (GallinaTyVar "a")))
-                 , ("cons", Spec [GallinaTyVar "a", GallinaTyList (GallinaTyVar "a")] (GallinaTyList (GallinaTyVar "a")))
-                 ]
-    toSpecAssoc :: GallinaConstructor -> (String, Specification)
-    toSpecAssoc c = (constrName c, constrSpec c)
-    constrSpec :: GallinaConstructor -> Specification
-    constrSpec c = let flat = flatTy . constrType $ c
-                   in Spec (init flat) (last flat)
 
 -- | Error message to display when we cannot find the type of a
 -- function definition.
@@ -113,12 +102,12 @@ extractMatches fun = case funBody fun of
 
 -- | Extract the Bove-Capretta data type from a function definition.
 extractPredicate :: Specifications -> GallinaFunctionBody -> VernacularCommand
-extractPredicate constrSpecAssocs fun = GallinaInductive
+extractPredicate specs fun = GallinaInductive
   [GallinaInductiveBody { inductiveName = predicateName fun
-                       , inductiveParams = freevars funtype
-                       , inductiveType = fromJust . unflatTy $ args ++ [GallinaTyProp]
-                       , inductiveConstrs = constrs
-                       }
+                        , inductiveParams = freevars funtype
+                        , inductiveType = fromJust . unflatTy $ args ++ [GallinaTyProp]
+                        , inductiveConstrs = constrs
+                        }
   ]
   False -- This data type is not coinductive.
   where
@@ -127,8 +116,6 @@ extractPredicate constrSpecAssocs fun = GallinaInductive
     (args, _) = argsResTy (funArity fun) (fromJust . funType $ fun)
     errorMsg = "extractPredicate: " ++ missingTypeMsg fun
     funtype = fromMaybe (error errorMsg) . funType $ fun
-    specs = M.insert (funName fun) (funSpec fun) constrSpecAssocs
-
 
 -- | Free variables of a type, ignoring the outermost
 -- 'GallinaTyForall'.
@@ -141,18 +128,12 @@ freevars t = ftv t
 predicateName :: GallinaFunctionBody -> String
 predicateName fun = funName fun ++ "_acc"
 
--- | Generate the name of the n-th constructor (corresponding to the
--- n-th match of the function) of the Bove-Capretta predicate of the
--- given function definition.
-constructorName :: GallinaFunctionBody -> Int -> String
-constructorName fun i = predicateName fun ++ "_" ++ show i
-
 -- | Generate the n-th constructor of the Bove-Capretta predicate of
 -- the given function definition.
 extractConstructor ::
   Specifications -> GallinaFunctionBody -> GallinaMatch -> Int -> GallinaConstructor
 extractConstructor specs fun match n =
-  GallinaConstructor { constrName = constructorName fun n
+  GallinaConstructor { constrName = predicateName fun ++ "_" ++ show i
                      , constrType = extractType specs fun match
                      }
 
@@ -188,22 +169,15 @@ extractContexts specs funspec pats =
 -- Bove-Capretta predicate.
 data GallinaPatAnnotated =
   GallinaPVarAnn String GallinaType
-  | GallinaPAppAnn String [GallinaPatAnnotated]
-  | GallinaPTupleAnn [GallinaPatAnnotated]
+  | GallinaPAppAnn String MultiPattern
+  | GallinaPTupleAnn MultiPattern
     deriving (Show, Eq)
-
--- | Extract the contexts out of an annotated multipattern.
-annotatedPatsToContexts :: [GallinaPatAnnotated] -> [Context]
-annotatedPatsToContexts = map f
-  where f (GallinaPVarAnn s ty) = [(s, ty)]
-        f (GallinaPAppAnn _ ps) = concat $ annotatedPatsToContexts ps
-        f (GallinaPTupleAnn ps) = concat $ annotatedPatsToContexts ps
 
 -- | Annotate a multipattern, given the specifications of the data
 -- constructors and the specification of the function to which the
 -- multipattern belongs to.
 annotatePats :: Specifications -> Specification
-                -> [GallinaPat] -> [GallinaPatAnnotated]
+                -> [GallinaPat] -> MultiPattern
 annotatePats specs (Spec args _) pats = zipWith ann pats args
   where
     ann :: GallinaPat -> GallinaType -> GallinaPatAnnotated
@@ -215,6 +189,22 @@ annotatePats specs (Spec args _) pats = zipWith ann pats args
     ann GallinaPWildCard _ = error "annotatePats: Wildcards unsupported."
     ann _ _ = error "annotatePats: pattern is not well-typed."
 
+-- | Remove the type annotations from a multipattern.
+removeAnnotations :: MultiPattern -> [GallinaPat]
+removeAnnotations = map removeAnnotations'
+  where
+    removeAnnotations' (GallinaPVarAnn var _ ) = GallinaPVar var
+    removeAnnotations' (GallinaPAppAnn s args) = GallinaPApp s (map removeAnnotations' args)
+    removeAnnotations' (GallinaPTupleAnn s   ) = GallinaPTuple (map removeAnnotations' s)
+
+-- | Extract the contexts out of an annotated multipattern.
+annotatedPatsToContexts :: MultiPattern -> [Context]
+annotatedPatsToContexts = map f
+  where f (GallinaPVarAnn s ty) = [(s, ty)]
+        f (GallinaPAppAnn _ ps) = concat $ annotatedPatsToContexts ps
+        f (GallinaPTupleAnn ps) = concat $ annotatedPatsToContexts ps
+
+
 -- | Try to unify the result type of the 'Specification' with the
 -- given 'GallinaType' and apply this substitution to the
 -- 'Specification'. We need this when dealing with data types that
@@ -222,41 +212,49 @@ annotatePats specs (Spec args _) pats = zipWith ann pats args
 substituteSpec :: Specification -> GallinaType -> Specification
 substituteSpec (Spec args res) ty = Spec (map subst args) (subst res)
   where
-    subst = unifyTypes res ty
+    subst = case unifyTypes res ty of
+      Left  err -> error ("substituteSpec: " ++ err)
+      Right sub -> sub
+
+-- | Try to unify the left type with the right one. Expects the left
+-- type to be the more general type. Note that it will crash if the
+-- types cannot be unified.
+unifyTypes :: GallinaType -> GallinaType -> Either String TySubst
+unifyTypes (GallinaTyApp p q) (GallinaTyApp r s) = do
+  s0 <- unifyTypes q s
+  s1 <- unifyTypes p r
+  return (s1 . s0)
+unifyTypes (GallinaTyCon s1 ) (GallinaTyCon s2 ) =
+  if s1 /= s2
+  then Left ("unifyTypes: could not unify " ++ show s1 ++ " with " ++ show s2 ++ ".")
+  else Right id
+unifyTypes (GallinaTyVar a)   r                  =
+  Right (mkTySubst a r)
+unifyTypes (GallinaTyList a)  (GallinaTyList b ) =
+  unifyTypes a b
+unifyTypes l                  r                  =
+  Left ("unifyTypes: unsupported: " ++ show l ++ " ~> " ++ show r ++ ".")
 
 -- | Type substitution.
 type TySubst = GallinaType -> GallinaType
 
 -- | Make a type substitution substituting the given variable with the
 -- given 'GallinaType. Note that trying to perform a substitution on a
--- 'GallinaTyForall' or a 'GallinaTyPi' will yield an error.
+-- 'GallinaTyForall', 'GallinaTyPi' or 'GallinaTyTerm' will yield an
+-- error.
 mkTySubst :: String -> GallinaType -> TySubst
-mkTySubst a ty (GallinaTyListTerm ts) = GallinaTyListTerm (map (mkTySubst a ty) ts)
 mkTySubst a ty (GallinaTyTuple ts   ) = GallinaTyTuple (map (mkTySubst a ty) ts)
 mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
-mkTySubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
 mkTySubst a ty (GallinaTyList t     ) = GallinaTyList (mkTySubst a ty t)
+mkTySubst a ty (GallinaTyEq l r     ) = GallinaTyEq (mkTySubst a ty l) (mkTySubst a ty r)
+mkTySubst _ _  (GallinaTyCon c      ) = GallinaTyCon c
 mkTySubst _ _  GallinaTySet           = GallinaTySet
 mkTySubst _ _  GallinaTyProp          = GallinaTyProp
-mkTySubst a ty (GallinaTyEq l r     ) = GallinaTyEq (mkTySubst a ty l) (mkTySubst a ty r)
-mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: foralls not allowed."
-mkTySubst _ _  (GallinaTyPi _ _     ) = error "mkTySubst: typi not allowed."
-
-
--- | Try to unify the left type with the right one. Expects the left
--- type to be the more general type. Note that it will crash if the
--- types cannot be unified.
-unifyTypes :: GallinaType -> GallinaType -> TySubst
-unifyTypes (GallinaTyApp p q) (GallinaTyApp r s) = unifyTypes p r . unifyTypes q s
-unifyTypes (GallinaTyCon s1 ) (GallinaTyCon s2 ) = if s1 /= s2
-                                              then error "unifyTypes: impossible happened"
-                                              else id
-unifyTypes (GallinaTyVar a)   r                  = mkTySubst a r
-unifyTypes (GallinaTyList a)  (GallinaTyList b ) = unifyTypes a b
-unifyTypes l                  r                  =
-  error $ "unifyTypes: unsupported: " ++ show l ++ " ~> " ++ show r
+mkTySubst _ _  (GallinaTyTerm _     ) = error "mkTySubst: terms should not occur here."
+mkTySubst _ _  (GallinaTyForall _ _ ) = error "mkTySubst: foralls should not occur here."
+mkTySubst _ _  (GallinaTyPi _ _     ) = error "mkTySubst: typi should not occur here."
 
 -- | Collect the recursive calls in a match, from left to
 -- right. Returns a list of types, so that they can be used to create
@@ -268,20 +266,9 @@ collectRecursiveCalls fun match = map (callToType . snd)
                                   $ match
   where
     callToType :: [GallinaTerm] -> GallinaType
-    callToType ts = termsToType ts (GallinaTyCon (predicateName fun))
+    callToType = GallinaTyTerm . foldl GallinaApp (GallinaVar (predicateName fun))
     isRecursive :: (String, [GallinaTerm]) -> Bool
     isRecursive = (== funName fun) . fst
-
--- | Convert a list of terms to a single type: transform all the terms
--- to a type and apply these as arguments to the given 'GallinaType'.
-termsToType :: [GallinaTerm] -> GallinaType -> GallinaType
-termsToType ts ty = foldl GallinaTyApp ty . map termToType $ ts
-
--- | Convert a term to a type.
-termToType :: GallinaTerm -> GallinaType
-termToType (GallinaVar s  ) = GallinaTyVar s
-termToType (GallinaApp l r) = GallinaTyApp (termToType l) (termToType r)
-termToType _                = error "termToType: only var and app supported."
 
 -- | Collect all the applications: associate the function being called
 -- with all its arguments.
@@ -292,13 +279,12 @@ collectArgs t = collectArgs' t False []
     collectArgs' (GallinaVar s  ) l args = if l
                                            then [(s, reverse args)]
                                            else []
-    collectArgs' (GallinaList _ ) l _    = if l
-                                           then undefined -- TODO: dit
-                                           else []
+    collectArgs' (GallinaList ts) l _    = if l
+                                           then error "collectArgs: term does not type check."
+                                           else concatMap (\x -> collectArgs' x False []) ts
     collectArgs' (GallinaApp l r) _ args = collectArgs' l True (args ++ [r])
                                            ++ collectArgs' r False []
     collectArgs' _                _ _    = error "collectArgs: only var and app supported"
-
 
 -- | Create the result type of a constructor of the Bove-Capretta
 -- predicate we are currently defining. The result of the constructor
@@ -329,10 +315,10 @@ extractNonTheorems tycons specs fun  = zipWith mkTheorem multipats ([0 ..] :: [I
     multipats = missingPats tycons specs fun
     params = map (\v -> (v, GallinaTySet)) . foldr L.union [] . map freevars $ argTys
     context multipat = extractContext specs (funSpec fun) multipat
-    predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar (map fst args)
+    predArg = foldl GallinaTyApp (GallinaTyCon (predicateName fun)) $ map GallinaTyVar (map fst args)
     argTys = case funSpec fun of Spec a _ -> a
     args = zipWith (\n t -> ("x" ++ show n, t)) [0 .. arity - 1] argTys
-    ty multipat = foldr GallinaTyFun (GallinaTyVar "Logic.False")
+    ty multipat = foldr GallinaTyFun (GallinaTyCon "Logic.False")
                   $ predArg : zipWith (\p n -> GallinaTyEq (GallinaTyVar ('x':show n)) (patternToType p)) multipat [0 .. arity - 1]
 
     mkTheorem multipat n = GallinaThmDef $ GallinaTheorem
@@ -392,7 +378,7 @@ addMissingPatterns tycons specs fun = fun { funBody = newBody }
 mkMissingMatches :: Int -> String -> GallinaType -> [MultiPattern] -> [GallinaMatch]
 mkMissingMatches arity name resultTy ms = zipWith (\mp n -> GallinaMatch (removeAnnotations mp) (term n)) ms ([0..] :: [Int])
   where
-    term n  = GallinaLam eqArgs $ foldl1 GallinaApp $ [GallinaVar "False_rec", GallinaTyTerm resultTy, foldl1 GallinaApp (GallinaVar (nonThm n) : map GallinaVar args)]
+    term n  = GallinaLam eqArgs $ foldl1 GallinaApp $ [GallinaVar "False_rec", GallinaTermTy resultTy, foldl1 GallinaApp (GallinaVar (nonThm n) : map GallinaVar args)]
     eqArgs = map (\n -> "_h" ++ show n) [0 .. arity - 1]
     args = ('x' : show arity) : eqArgs
     nonThm n = name ++ "_acc_non_" ++ show n
@@ -431,8 +417,8 @@ data MultiPatSubst =
   | IdSubst
     deriving Show
 
--- | Try to unify two multipattern. We assume that length ps0 ==
--- length ps1, i.e. no malformed pats.
+-- | Try to unify two multipatterns. We assume that @length ps0 ==
+-- length ps1@, i.e. no malformed pats.
 unifyMultiPats :: MultiPattern -> MultiPattern -> Maybe MultiPatSubst
 unifyMultiPats l r = fmap (foldr Compose IdSubst)
                      $ sequence
@@ -502,18 +488,18 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
 
 -- | Fetch the left-most type constructor.
 getTypeConstr :: GallinaType -> String
-getTypeConstr (GallinaTyListTerm _ ) = error "getTypeConstr: lists not supported."
 getTypeConstr (GallinaTyTuple s    ) = "* " ++ show (length s) -- urgh
 getTypeConstr (GallinaTyList _     ) = "list"
 getTypeConstr (GallinaTyApp l _    ) = getTypeConstr l
 getTypeConstr (GallinaTyCon c      ) = c
-getTypeConstr (GallinaTyForall _ _ ) = error "getTypeConstr: foralls not supported."
-getTypeConstr (GallinaTyFun _ _    ) = error "getTypeConstr: function types not supported."
-getTypeConstr (GallinaTyVar _      ) = error "getTypeConstr: type var not supported."
-getTypeConstr GallinaTySet           = error "getTypeConstr: set type not supported."
-getTypeConstr GallinaTyProp          = error "getTypeConstr: prop type not supported."
-getTypeConstr (GallinaTyPi _ _     ) = error "getTypeConstr: pi types not supported."
-getTypeConstr (GallinaTyEq _ _     ) = error "getTypeConstr: type equality"
+getTypeConstr (GallinaTyTerm _     ) = error "getTypeConstr: terms should not occur here."
+getTypeConstr (GallinaTyForall _ _ ) = error "getTypeConstr: foralls should not occur here."
+getTypeConstr (GallinaTyFun _ _    ) = error "getTypeConstr: function types should not occur here."
+getTypeConstr (GallinaTyVar _      ) = error "getTypeConstr: type var should not occur here."
+getTypeConstr GallinaTySet           = error "getTypeConstr: set type should not occur here."
+getTypeConstr GallinaTyProp          = error "getTypeConstr: prop type should not occur here."
+getTypeConstr (GallinaTyPi _ _     ) = error "getTypeConstr: pi types should not occur here."
+getTypeConstr (GallinaTyEq _ _     ) = error "getTypeConstr: type equalities should not occur here."
 
 maybeTuple :: (a, Maybe b) -> Maybe (a, b)
 maybeTuple (_, Nothing) = Nothing
@@ -531,7 +517,6 @@ splitVar tycons specs ty n var ideal = map (\s -> applyMultiPatSubst s ideal) su
   mkPat c (Spec args _) = GallinaPAppAnn c $ zipWith (\t m -> GallinaPVarAnn ("_p" ++ show n ++ "x" ++ show m) t) args ([0..] :: [Int])
 
 -- Manipulate terms
-
 manipulateTerm :: Int -> Int -> String -> GallinaTerm -> GallinaTerm
 manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
                      in t'
@@ -548,7 +533,14 @@ manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
                                      , True
                                      )
       | otherwise                  = (t,n,False)
-    count' n (GallinaApp l r) isRight
+    count' n (GallinaList ts)   isRight
+      | isRight                    = let (n', t') = sequence' n ts
+                                     in (GallinaList t', n', False)
+      where
+        sequence' nn []     = (nn, [])
+        sequence' nn (x:xs) = let (t', nn', b) = count' nn x True
+                              in (if b then nn'+1 else nn', t' : snd (sequence' nn' xs))
+    count' n (GallinaApp l r)  isRight
       | isRight && b                = ( GallinaApp (GallinaApp l' r') (term' n)
                                      , n''
                                      , b
@@ -557,10 +549,11 @@ manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
                                      , n''
                                      , b
                                      )
+
       where
         (l', n' ,b) = count' n l False
         (r', n'',_) = count' n' r True
-    count' n t b = trace "manipulateTerm: cannot manipulate terms that contain something other than applications or variables." $ (t, n, b)
+    count' n t b = trace "manipulateTerm: cannot manipulate terms that contain something other than applications, variables or lists." $ (t, n, b)
     term' n = foldl1 GallinaApp (GallinaVar (invThm n) : map GallinaVar args)
     eqArgs = map (\n -> "_h" ++ show n) [0 .. arity - 1]
     args = ('x' : show arity) : eqArgs
@@ -582,7 +575,7 @@ extractInvTheorems specs fun = concat $ zipWith calls matches ([0 ..] :: [Int])
     params = map (\v -> (v, GallinaTySet)) . foldr L.union [] . map freevars $ argTys
     context = concat . contexts
     contexts multipat = extractContexts specs (funSpec fun) multipat
-    predArg = foldl GallinaTyApp (GallinaTyVar (predicateName fun)) $ map GallinaTyVar (map fst args)
+    predArg = foldl GallinaTyApp (GallinaTyCon (predicateName fun)) $ map GallinaTyVar (map fst args)
     argTys = case funSpec fun of Spec a _ -> a
     args = zipWith (\n t -> ("x" ++ show n, t)) [0 .. arity - 1] argTys
     ty call multipat = foldr GallinaTyFun call

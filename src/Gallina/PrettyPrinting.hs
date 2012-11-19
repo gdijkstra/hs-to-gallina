@@ -31,14 +31,10 @@ vsep = vcat . intersperse (text "")
 ppVernacularDocument :: VernacularDocument -> String
 ppVernacularDocument = render . pp
 
--- | TODO: this should be removed.
-ppGroup :: (Pp a) => String -> [a] -> Doc
-ppGroup name is = text name <+> vcat (intersperse (text "with") . map pp $ is)
-
 -- | Group a bunch of definitions and intersperse them with the
 -- keyword @\"with\"@. Used for mutually recursive definitions.
 ppGroupDotted :: (Pp a) => String -> [a] -> Doc
-ppGroupDotted name is = ppGroup name is <> char '.'
+ppGroupDotted name is = text name <+> vcat (intersperse (text "with") . map pp $ is) <> char '.'
 
 instance Pp VernacularDocument where
   pp a = vsep [text "Module" <+> text (documentName a) <> char '.'
@@ -61,9 +57,9 @@ instance Pp VernacularCommand where
   pp GallinaUnsetImplicit  = text "Unset Implicit Arguments."
 
 instance Pp GallinaLetDefinition where
-  pp (GallinaLetFixpoint b   ) = ppGroup "fix" [b]
-  pp (GallinaLetFunction b   ) = ppGroup "" [b]
-  pp (GallinaLetPatBinding b ) = ppGroup "" [b]
+  pp (GallinaLetFixpoint b   ) = text "fix" <+> pp b
+  pp (GallinaLetFunction b   ) = pp b
+  pp (GallinaLetPatBinding b ) = pp b
 
 instance Pp GallinaInductiveBody where
   pp a = hsep [ text (inductiveName a)
@@ -172,8 +168,7 @@ instance Pp GallinaType where
                                                             , pp t2
                                                             ]
   ppPrec p (GallinaTyList t     ) = parensIf (p > 1) $ text "List" <+> ppPrec 2 t
-  ppPrec _ (GallinaTyListTerm []) = text "nil"
-  ppPrec _ (GallinaTyListTerm ts) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
+  ppPrec p (GallinaTyTerm t     ) = ppPrec p t
   ppPrec p (GallinaTyTuple ts   ) = parensIf (p > 0) $ hcat . intersperse (text " * ") . map (ppPrec 1) $ ts
 
 instance Pp GallinaTerm where
@@ -200,7 +195,7 @@ instance Pp GallinaTerm where
                                         , text "then", pp t
                                         , text "else", pp f
                                         ]
-  ppPrec _ (GallinaTyTerm ty    ) = ppPrec 2 ty
+  ppPrec _ (GallinaTermTy ty    ) = ppPrec 2 ty
   ppPrec _ (GallinaList []      ) = text "nil"
   ppPrec _ (GallinaList ts      ) = char '[' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ']'
   ppPrec _ (GallinaTuple ts     ) = char '(' <> (hcat . intersperse (text ", ") . map pp $ ts) <> char ')'

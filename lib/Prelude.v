@@ -49,8 +49,10 @@ Extract Constant List "a" => "[a]".
 Extract Inlined Constant app => "(Prelude.++)".
 
 Definition filter := filter.
-
+Implicit Arguments app [A].
+Definition concat {A : Type} (l : list (list A)) := fold_right (app (A:=A)) nil l.
 Implicit Arguments filter [A].
+Implicit Arguments concat [A].
 
 (* Tuples *)
 

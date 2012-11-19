@@ -143,8 +143,6 @@ data GallinaType =
   | GallinaTyCon String
   -- | List type.
   | GallinaTyList GallinaType
-  -- | List term as a type. TODO: remove this and add GallinaTyTerm GallinaTerm instead.
-  | GallinaTyListTerm [GallinaType]
   -- | Tuple type.
   | GallinaTyTuple [GallinaType]
   -- | Set type.
@@ -156,6 +154,8 @@ data GallinaType =
   | GallinaTyPi [(String, GallinaType)] GallinaType
   -- | Equality type.
   | GallinaTyEq GallinaType GallinaType
+  -- | A term as a type as needed for the Bove-Capretta method..
+  | GallinaTyTerm GallinaTerm
   deriving (Show, Eq)
 
 -- | Terms.
@@ -176,7 +176,7 @@ data GallinaTerm =
   -- | if-then-else expression.
   | GallinaIf GallinaTerm GallinaTerm GallinaTerm
   -- | Type as a term as needed for the Bove-Capretta method.
-  | GallinaTyTerm GallinaType
+  | GallinaTermTy GallinaType
   -- | List expression.
   | GallinaList [GallinaTerm]
   -- | Tuple expression.
@@ -208,8 +208,9 @@ unions = foldr union []
 
 -- | Calculate the free type variables.
 ftv :: GallinaType -> [String]
-ftv (GallinaTyForall _ _ ) = error "ftv: foralls should not occur here"
-ftv (GallinaTyPi _ _     ) = error "ftv: pi types should not occur here"
+ftv (GallinaTyForall _ _ ) = error "ftv: foralls should not occur here."
+ftv (GallinaTyPi _ _     ) = error "ftv: pi types should not occur here."
+ftv (GallinaTyTerm _     ) = error "ftv: terms should not occur here."
 ftv (GallinaTyEq l r     ) = union (ftv l) (ftv r)
 ftv (GallinaTyFun l r    ) = union (ftv l) (ftv r)
 ftv (GallinaTyApp l r    ) = union (ftv l) (ftv r)
@@ -219,7 +220,6 @@ ftv (GallinaTySet        ) = []
 ftv (GallinaTyProp       ) = []
 ftv (GallinaTyList t     ) = ftv t
 ftv (GallinaTyTuple ts   ) = unions . map ftv $ ts
-ftv (GallinaTyListTerm ts) = unions . map ftv $ ts
 
 -- | Flatten a type, i.e. replace the GallinaTyFun constructor by (:).
 flatTy :: GallinaType -> [GallinaType]
@@ -232,9 +232,9 @@ flatTy ty@(GallinaTySet        ) = [ty]
 flatTy ty@(GallinaTyProp       ) = [ty]
 flatTy ty@(GallinaTyList _     ) = [ty]
 flatTy ty@(GallinaTyTuple _    ) = [ty]
-flatTy ty@(GallinaTyListTerm _ ) = [ty]
-flatTy (GallinaTyPi _ _        ) = error "flatTy: pi types should not occur here"
-flatTy (GallinaTyEq _ _        ) = error "flatTy: equality types should not occur here"
+flatTy (GallinaTyTerm _        ) = error "flatTy: terms should not occur here."
+flatTy (GallinaTyPi _ _        ) = error "flatTy: pi types should not occur here."
+flatTy (GallinaTyEq _ _        ) = error "flatTy: equality types should not occur here."
 
 -- | Unflatten a type, i.e. inverse of flatTy. Returns 'Nothing' if
 -- the list is empty.

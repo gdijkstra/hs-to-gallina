@@ -38,10 +38,7 @@ declName (GallinaUngroupedFunOrPat (Right b) ) = patName b
 
 -- | Extract the dependencies from a type.
 typeDeps :: GallinaType -> [String]
-typeDeps (GallinaTyListTerm ts   ) = concatMap typeDeps ts
 typeDeps (GallinaTyTuple ts      ) = concatMap typeDeps ts
-typeDeps (GallinaTyEq _ _        ) = error "typeDeps: eq types should not occur here"
-typeDeps (GallinaTyPi _ _        ) = error "typeDeps: pi types should not occur here"
 typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
 typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r
@@ -50,6 +47,9 @@ typeDeps (GallinaTyVar _         ) = []
 typeDeps (GallinaTyCon v         ) = [v]
 typeDeps (GallinaTySet           ) = []
 typeDeps (GallinaTyProp          ) = []
+typeDeps (GallinaTyEq _ _        ) = error "typeDeps: eq types should not occur here."
+typeDeps (GallinaTyPi _ _        ) = error "typeDeps: pi types should not occur here."
+typeDeps (GallinaTyTerm _        ) = error "typeDeps: terms should not occur here."
 
 -- | Associate all the ungrouped definitions with their types and add
 -- the dependencies induced by that type. Raises an error if it cannot
