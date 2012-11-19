@@ -37,15 +37,12 @@ sem Pat
   | PParen
      lhs.gallinaPat = @pat.gallinaPat
      lhs.var = @pat.var
-  | PTuple
-     lhs.gallinaPat = GallinaPTuple @pats.gallinaPats
-     lhs.var = error "unsupported pattern in lambda"
   | PList
      lhs.gallinaPat = foldr (\a b -> GallinaPApp "cons" [a, b]) (GallinaPApp "nil" []) @pats.gallinaPats
      lhs.var = error "unsupported pattern in lambda"
   | PInfixApp
      lhs.gallinaPat = GallinaPApp @qname.gallinaPatName [@pat.gallinaPat, @pat1.gallinaPat]
-  | PNPlusK PRec PAsPat PIrrPat PatTypeSig PViewPat
+  | PNPlusK PRec PAsPat PIrrPat PatTypeSig PViewPat PTuple
     PRPat PXTag PXETag PXPcdata PXPatTag PXRPats PExplTypeArg PQuasiQuote
     PBangPat PNeg
      lhs.gallinaPat = error "unsupported pattern"
@@ -157,11 +154,9 @@ sem Exp
      lhs.gallinaTerm = @exp.gallinaTerm
   | List
      lhs.gallinaTerm = GallinaList @exps.gallinaTerms
-  | Tuple
-     lhs.gallinaTerm = GallinaTuple @exps.gallinaTerms
   | InfixApp
      lhs.gallinaTerm = GallinaApp (GallinaApp (GallinaVar @qop.gallinaTermName) @exp.gallinaTerm) @exp1.gallinaTerm
-  | NegApp IPVar Do MDo TupleSection
+  | NegApp IPVar Do MDo Tuple TupleSection
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote BracketExp SpliceExp QuasiQuote XTag XETag XPcdata XExpTag

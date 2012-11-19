@@ -38,7 +38,6 @@ declName (GallinaUngroupedFunOrPat (Right b) ) = patName b
 
 -- | Extract the dependencies from a type.
 typeDeps :: GallinaType -> [String]
-typeDeps (GallinaTyTuple ts      ) = concatMap typeDeps ts
 typeDeps (GallinaTyForall vars t ) = vars `difference` typeDeps t
 typeDeps (GallinaTyFun l r       ) = typeDeps l ++ typeDeps r
 typeDeps (GallinaTyApp l r       ) = typeDeps l ++ typeDeps r

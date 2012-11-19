@@ -120,8 +120,6 @@ data GallinaMatch =
 data GallinaPat =
   -- | Pattern variable.
   GallinaPVar String
-  -- | Tuple pattern.
-  | GallinaPTuple [GallinaPat]
   -- | Application of a constructor to a list of patterns.
   | GallinaPApp String [GallinaPat]
   -- | Wildcard pattern.
@@ -143,8 +141,6 @@ data GallinaType =
   | GallinaTyCon String
   -- | List type.
   | GallinaTyList GallinaType
-  -- | Tuple type.
-  | GallinaTyTuple [GallinaType]
   -- | Set type.
   | GallinaTySet
   -- | Prop type.
@@ -179,8 +175,6 @@ data GallinaTerm =
   | GallinaTermTy GallinaType
   -- | List expression.
   | GallinaList [GallinaTerm]
-  -- | Tuple expression.
-  | GallinaTuple [GallinaTerm]
   deriving (Show, Eq)
 
 -- | Theorem definition.
@@ -219,7 +213,6 @@ ftv (GallinaTyCon _      ) = []
 ftv (GallinaTySet        ) = []
 ftv (GallinaTyProp       ) = []
 ftv (GallinaTyList t     ) = ftv t
-ftv (GallinaTyTuple ts   ) = unions . map ftv $ ts
 
 -- | Flatten a type, i.e. replace the GallinaTyFun constructor by (:).
 flatTy :: GallinaType -> [GallinaType]
@@ -231,7 +224,6 @@ flatTy ty@(GallinaTyCon _      ) = [ty]
 flatTy ty@(GallinaTySet        ) = [ty]
 flatTy ty@(GallinaTyProp       ) = [ty]
 flatTy ty@(GallinaTyList _     ) = [ty]
-flatTy ty@(GallinaTyTuple _    ) = [ty]
 flatTy (GallinaTyTerm _        ) = error "flatTy: terms should not occur here."
 flatTy (GallinaTyPi _ _        ) = error "flatTy: pi types should not occur here."
 flatTy (GallinaTyEq _ _        ) = error "flatTy: equality types should not occur here."
@@ -267,5 +259,4 @@ resTy arity ty = snd . argsResTy arity $ ty
 patVars :: GallinaPat -> [String]
 patVars (GallinaPVar s    ) = [s]
 patVars (GallinaPApp s ps ) = s : concatMap patVars ps
-patVars (GallinaPTuple ps ) = concatMap patVars ps
 patVars GallinaPWildCard    = []

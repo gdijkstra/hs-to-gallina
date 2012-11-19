@@ -61,11 +61,9 @@ sem Exp
      lhs.dependencies = @exps.dependencies
   | InfixApp
      lhs.dependencies = concat [@exp.dependencies, @qop.dependencies, @exp1.dependencies]
-  | Tuple
-     lhs.dependencies = @exps.dependencies
   | If
      lhs.dependencies = concat [@exp.dependencies, @exp1.dependencies, @exp2.dependencies]
-  | NegApp IPVar Do MDo TupleSection BracketExp
+  | NegApp IPVar Do MDo TupleSection BracketExp Tuple
     LeftSection RightSection RecConstr RecUpdate EnumFrom EnumFromTo
     EnumFromThen EnumFromThenTo ListComp ParComp ExpTypeSig VarQuote
     TypQuote SpliceExp QuasiQuote XTag XETag XPcdata XExpTag
@@ -112,11 +110,9 @@ sem Type
      lhs.dependencies = [@qname.name]
   | TyParen
      lhs.dependencies = @ty.dependencies
-  | TyTuple
-     lhs.dependencies = @types.dependencies
   | TyList
      lhs.dependencies = @ty.dependencies
-  | TyForall TyInfix TyKind
+  | TyForall TyInfix TyKind TyTuple
      lhs.dependencies = error "dependencies: Unsupported construct type"
 
 sem Alt

@@ -170,7 +170,6 @@ extractContexts specs funspec pats =
 data GallinaPatAnnotated =
   GallinaPVarAnn String GallinaType
   | GallinaPAppAnn String MultiPattern
-  | GallinaPTupleAnn MultiPattern
     deriving (Show, Eq)
 
 -- | Annotate a multipattern, given the specifications of the data
@@ -181,13 +180,11 @@ annotatePats :: Specifications -> Specification
 annotatePats specs (Spec args _) pats = zipWith ann pats args
   where
     ann :: GallinaPat -> GallinaType -> GallinaPatAnnotated
-    ann (GallinaPTuple s ) (GallinaTyTuple tys) = GallinaPTupleAnn $ zipWith ann s tys
     ann (GallinaPVar s   ) ty = GallinaPVarAnn s ty
     ann (GallinaPApp c ps) ty = case M.lookup c specs of
       Nothing -> error $ "annotatePats: could not find spec of constr: " ++ show c
       Just spec -> GallinaPAppAnn c (annotatePats specs (substituteSpec spec ty) ps)
     ann GallinaPWildCard _ = error "annotatePats: Wildcards unsupported."
-    ann _ _ = error "annotatePats: pattern is not well-typed."
 
 -- | Remove the type annotations from a multipattern.
 removeAnnotations :: MultiPattern -> [GallinaPat]
@@ -195,15 +192,12 @@ removeAnnotations = map removeAnnotations'
   where
     removeAnnotations' (GallinaPVarAnn var _ ) = GallinaPVar var
     removeAnnotations' (GallinaPAppAnn s args) = GallinaPApp s (map removeAnnotations' args)
-    removeAnnotations' (GallinaPTupleAnn s   ) = GallinaPTuple (map removeAnnotations' s)
 
 -- | Extract the contexts out of an annotated multipattern.
 annotatedPatsToContexts :: MultiPattern -> [Context]
 annotatedPatsToContexts = map f
   where f (GallinaPVarAnn s ty) = [(s, ty)]
         f (GallinaPAppAnn _ ps) = concat $ annotatedPatsToContexts ps
-        f (GallinaPTupleAnn ps) = concat $ annotatedPatsToContexts ps
-
 
 -- | Try to unify the result type of the 'Specification' with the
 -- given 'GallinaType' and apply this substitution to the
@@ -243,7 +237,6 @@ type TySubst = GallinaType -> GallinaType
 -- 'GallinaTyForall', 'GallinaTyPi' or 'GallinaTyTerm' will yield an
 -- error.
 mkTySubst :: String -> GallinaType -> TySubst
-mkTySubst a ty (GallinaTyTuple ts   ) = GallinaTyTuple (map (mkTySubst a ty) ts)
 mkTySubst a ty (GallinaTyFun l r    ) = GallinaTyFun (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyApp l r    ) = GallinaTyApp (mkTySubst a ty l) (mkTySubst a ty r)
 mkTySubst a ty (GallinaTyVar s      ) = if a == s then ty else GallinaTyVar s
@@ -297,7 +290,6 @@ resultType fun pats = foldl1 GallinaTyApp $ GallinaTyCon (predicateName fun) : m
 -- | Convert a pattern to a type. Will crash on wildcards as we do not
 -- support those.
 patternToType :: GallinaPat -> GallinaType
-patternToType (GallinaPTuple ps ) = GallinaTyTuple . map patternToType $ ps
 patternToType (GallinaPVar s    ) = GallinaTyVar s
 patternToType (GallinaPApp s ps ) = foldl GallinaTyApp (GallinaTyCon s)
                                     . map patternToType $ ps
@@ -434,9 +426,6 @@ unifyPatAnn (GallinaPAppAnn c0 ps0) (GallinaPAppAnn c1 ps1)
   | otherwise = do
     substs <- sequence . map (uncurry unifyPatAnn) $ zip ps0 ps1
     return . foldr Compose IdSubst $ substs
-unifyPatAnn (GallinaPTupleAnn ps0 ) (GallinaPTupleAnn ps1) = do
-  substs <- sequence . map (uncurry unifyPatAnn) $ zip ps0 ps1
-  return . foldr Compose IdSubst $ substs
 unifyPatAnn _                       _                      = Nothing
 
 -- | Apply a multipattern substitution.
@@ -450,9 +439,6 @@ applyMultiPatSubst = map . applyPatSubst
     applyVarSubst :: String -> GallinaPatAnnotated -> GallinaPatAnnotated -> GallinaPatAnnotated
     applyVarSubst v0 pat0 pat1@(GallinaPVarAnn v1 _  ) = if v0 == v1 then pat0 else pat1
     applyVarSubst v0 pat0 (GallinaPAppAnn constr pats) = GallinaPAppAnn constr
-                                                         . map (applyVarSubst v0 pat0)
-                                                         $ pats
-    applyVarSubst v0 pat0 (GallinaPTupleAnn pats     ) = GallinaPTupleAnn
                                                          . map (applyVarSubst v0 pat0)
                                                          $ pats
 
@@ -488,7 +474,6 @@ invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
 
 -- | Fetch the left-most type constructor.
 getTypeConstr :: GallinaType -> String
-getTypeConstr (GallinaTyTuple s    ) = "* " ++ show (length s) -- urgh
 getTypeConstr (GallinaTyList _     ) = "list"
 getTypeConstr (GallinaTyApp l _    ) = getTypeConstr l
 getTypeConstr (GallinaTyCon c      ) = c
