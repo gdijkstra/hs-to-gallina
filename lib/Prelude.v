@@ -39,7 +39,7 @@ Extract Inductive bool => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
 Require Import List.
 Open Scope list_scope.
 
-Definition List a := list a.
+Definition List (a : Set) := list a.
 
 Notation "[ ]" := nil.
 Notation "[ x , .. , y ]" := (cons x .. (cons y nil) ..).
@@ -52,7 +52,6 @@ Definition filter := filter.
 Implicit Arguments app [A].
 Definition concat {A : Type} (l : list (list A)) := fold_right (app (A:=A)) nil l.
 Implicit Arguments filter [A].
-Implicit Arguments concat [A].
 
 (* Tuples *)
 

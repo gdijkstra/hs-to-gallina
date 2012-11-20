@@ -6,7 +6,7 @@ echo "Removing all temporary files."
 rm -f *.glob *.v *.vo extracted/*
 
 # Test stuff that should work.
-positiveTests="Log.hs Quicksort.hs Notation.hs Coinduction.hs"
+positiveTests="Log.hs Quicksort.hs Notation.hs Coinduction.hs Recursion.hs"
 success=0
 total=0
 
@@ -22,7 +22,8 @@ do
         if [[ $? -eq 0 ]]
         then 
             echo "RunTests: coqc run succesfully" 
-            ghc -c extracted/$f
+            sed -i 's/unsafeCoerce :: a -> b//' extracted/$f
+            ghc -fno-warn-deprecated-flags -c extracted/$f 
             if [[ $? -eq 0 ]]
             then
                 echo "RunTests: ghc compiled extracted code succesfully"
