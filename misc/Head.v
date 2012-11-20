@@ -28,6 +28,79 @@ refine (match x0 with
 constructor.
 Defined.
 
+Definition idBool : Bool -> Bool :=
+             id.
+
+Definition exampleList : List Bool :=
+             cons True nil.
+
+Set Implicit Arguments.
+
+Inductive Zag : Set :=
+          | ZagC : Zig -> Zag
+          | ZagStop : Zag
+          with
+          Zig : Set :=
+          | ZigC : Zag -> Zig
+          | ZigStop : Zig.
+
+Inductive Rose ( a : Set ) : Set :=
+          | R : a -> List (Rose a) -> Rose a.
+
+Unset Implicit Arguments.
+
+Definition rose : Rose Bool :=
+             R True (cons (R True nil) (cons (R False nil) nil)).
+
+Set Implicit Arguments.
+
+Inductive Pair ( a : Set ) : Set :=
+          | P : a -> a -> Pair a.
+
+Inductive Perfect ( a : Set ) : Set :=
+          | Z : a -> Perfect a
+          | S : Perfect (Pair a) -> Perfect a.
+
+Unset Implicit Arguments.
+
+Definition perfect : Perfect Bool :=
+             S (Z (P True True)).
+
+Set Implicit Arguments.
+
+Inductive Nat : Set :=
+          | Zero : Nat
+          | Succ : Nat -> Nat.
+
+Unset Implicit Arguments.
+
+refine (
+fix  (x0 : Zig) : Nat =>
+
+           match x0 with
+             | ZigStop => Zero
+             | ZigC z => countZagZig z
+           end
+         with
+         countZagZig (x0 : Zag) : Nat :=
+           match x0 with
+             | ZagStop => Zero
+             | ZagC z => countZigZag z
+           end
+    ).
+
+Fixpoint plus (x0 : Nat) (x1 : Nat) : Nat :=
+           match x0, x1 with
+             | Zero, x => x
+             | Succ k, x => Succ (plus k x)
+           end.
+
+Definition test (x0 : Nat) : Bool -> Bool :=
+             match x0 with
+               | Zero => idBool
+               | Succ k => not
+             end.
+
 End Head.
 
 Extraction "Head.hs" Head.

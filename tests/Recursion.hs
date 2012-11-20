@@ -19,8 +19,18 @@ idBool = id
 
 -- Simple mutually recursive data types.
 data Zig = ZigC Zag
+         | ZigStop
 
 data Zag = ZagC Zig
+         | ZagStop
+
+countZigZag :: Zig -> Nat
+countZigZag ZigStop = Zero
+countZigZag (ZigC z) = countZagZig z
+
+countZagZig :: Zag -> Nat
+countZagZig ZagStop = Zero
+countZagZig (ZagC z) = countZigZag z
 
 -- Perfect binary trees
 data Pair a = P a a
