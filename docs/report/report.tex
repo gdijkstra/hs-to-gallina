@@ -1,0 +1,457 @@
+\documentclass[a4paper,10pt]{article}
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+%
+%
+\makeatletter
+\@ifundefined{lhs2tex.lhs2tex.sty.read}%
+  {\@namedef{lhs2tex.lhs2tex.sty.read}{}%
+   \newcommand\SkipToFmtEnd{}%
+   \newcommand\EndFmtInput{}%
+   \long\def\SkipToFmtEnd#1\EndFmtInput{}%
+  }\SkipToFmtEnd
+
+\newcommand\ReadOnlyOnce[1]{\@ifundefined{#1}{\@namedef{#1}{}}\SkipToFmtEnd}
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\rbind}{\mathbin{=\mkern-6.7mu<\!\!\!<}}% suggested by Neil Mitchell
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\usepackage{polytable}
+
+%mathindent has to be defined
+\@ifundefined{mathindent}%
+  {\newdimen\mathindent\mathindent\leftmargini}%
+  {}%
+
+\def\resethooks{%
+  \global\let\SaveRestoreHook\empty
+  \global\let\ColumnHook\empty}
+\newcommand*{\savecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\savecolumns[#1]}}
+\newcommand*{\restorecolumns}[1][default]%
+  {\g@addto@macro\SaveRestoreHook{\restorecolumns[#1]}}
+\newcommand*{\aligncolumn}[2]%
+  {\g@addto@macro\ColumnHook{\column{#1}{#2}}}
+
+\resethooks
+
+\newcommand{\onelinecommentchars}{\quad-{}- }
+\newcommand{\commentbeginchars}{\enskip\{-}
+\newcommand{\commentendchars}{-\}\enskip}
+
+\newcommand{\visiblecomments}{%
+  \let\onelinecomment=\onelinecommentchars
+  \let\commentbegin=\commentbeginchars
+  \let\commentend=\commentendchars}
+
+\newcommand{\invisiblecomments}{%
+  \let\onelinecomment=\empty
+  \let\commentbegin=\empty
+  \let\commentend=\empty}
+
+\visiblecomments
+
+\newlength{\blanklineskip}
+\setlength{\blanklineskip}{0.66084ex}
+
+\newcommand{\hsindent}[1]{\quad}% default is fixed indentation
+\let\hspre\empty
+\let\hspost\empty
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\EndFmtInput
+\makeatother
+%
+%
+%
+%
+%
+%
+% This package provides two environments suitable to take the place
+% of hscode, called "plainhscode" and "arrayhscode". 
+%
+% The plain environment surrounds each code block by vertical space,
+% and it uses \abovedisplayskip and \belowdisplayskip to get spacing
+% similar to formulas. Note that if these dimensions are changed,
+% the spacing around displayed math formulas changes as well.
+% All code is indented using \leftskip.
+%
+% Changed 19.08.2004 to reflect changes in colorcode. Should work with
+% CodeGroup.sty.
+%
+\ReadOnlyOnce{polycode.fmt}%
+\makeatletter
+
+\newcommand{\hsnewpar}[1]%
+  {{\parskip=0pt\parindent=0pt\par\vskip #1\noindent}}
+
+% can be used, for instance, to redefine the code size, by setting the
+% command to \small or something alike
+\newcommand{\hscodestyle}{}
+
+% The command \sethscode can be used to switch the code formatting
+% behaviour by mapping the hscode environment in the subst directive
+% to a new LaTeX environment.
+
+\newcommand{\sethscode}[1]%
+  {\expandafter\let\expandafter\hscode\csname #1\endcsname
+   \expandafter\let\expandafter\endhscode\csname end#1\endcsname}
+
+% "compatibility" mode restores the non-polycode.fmt layout.
+
+\newenvironment{compathscode}%
+  {\par\noindent
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed\)%
+   \par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\compaths}{\sethscode{compathscode}}
+
+% "plain" mode is the proposed default.
+% It should now work with \centering.
+% This required some changes. The old version
+% is still available for reference as oldplainhscode.
+
+\newenvironment{plainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\hspre\(\let\hspost\)%
+   \pboxed}%
+  {\endpboxed%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newenvironment{oldplainhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+% Here, we make plainhscode the default environment.
+
+\newcommand{\plainhs}{\sethscode{plainhscode}}
+\newcommand{\oldplainhs}{\sethscode{oldplainhscode}}
+\plainhs
+
+% The arrayhscode is like plain, but makes use of polytable's
+% parray environment which disallows page breaks in code blocks.
+
+\newenvironment{arrayhscode}%
+  {\hsnewpar\abovedisplayskip
+   \advance\leftskip\mathindent
+   \hscodestyle
+   \let\\=\@normalcr
+   \(\parray}%
+  {\endparray\)%
+   \hsnewpar\belowdisplayskip
+   \ignorespacesafterend}
+
+\newcommand{\arrayhs}{\sethscode{arrayhscode}}
+
+% The mathhscode environment also makes use of polytable's parray 
+% environment. It is supposed to be used only inside math mode 
+% (I used it to typeset the type rules in my thesis).
+
+\newenvironment{mathhscode}%
+  {\parray}{\endparray}
+
+\newcommand{\mathhs}{\sethscode{mathhscode}}
+
+% texths is similar to mathhs, but works in text mode.
+
+\newenvironment{texthscode}%
+  {\(\parray}{\endparray\)}
+
+\newcommand{\texths}{\sethscode{texthscode}}
+
+% The framed environment places code in a framed box.
+
+\def\codeframewidth{\arrayrulewidth}
+\RequirePackage{calc}
+
+\newenvironment{framedhscode}%
+  {\parskip=\abovedisplayskip\par\noindent
+   \hscodestyle
+   \arrayrulewidth=\codeframewidth
+   \tabular{@{}|p{\linewidth-2\arraycolsep-2\arrayrulewidth-2pt}|@{}}%
+   \hline\framedhslinecorrect\\{-1.5ex}%
+   \let\endoflinesave=\\
+   \let\\=\@normalcr
+   \(\pboxed}%
+  {\endpboxed\)%
+   \framedhslinecorrect\endoflinesave{.5ex}\hline
+   \endtabular
+   \parskip=\belowdisplayskip\par\noindent
+   \ignorespacesafterend}
+
+\newcommand{\framedhslinecorrect}[2]%
+  {#1[#2]}
+
+\newcommand{\framedhs}{\sethscode{framedhscode}}
+
+% The inlinehscode environment is an experimental environment
+% that can be used to typeset displayed code inline.
+
+\newenvironment{inlinehscode}%
+  {\(\def\column##1##2{}%
+   \let\>\undefined\let\<\undefined\let\\\undefined
+   \newcommand\>[1][]{}\newcommand\<[1][]{}\newcommand\\[1][]{}%
+   \def\fromto##1##2##3{##3}%
+   \def\nextline{}}{\) }%
+
+\newcommand{\inlinehs}{\sethscode{inlinehscode}}
+
+% The joincode environment is a separate environment that
+% can be used to surround and thereby connect multiple code
+% blocks.
+
+\newenvironment{joincode}%
+  {\let\orighscode=\hscode
+   \let\origendhscode=\endhscode
+   \def\endhscode{\def\hscode{\endgroup\def\@currenvir{hscode}\\}\begingroup}
+   %\let\SaveRestoreHook=\empty
+   %\let\ColumnHook=\empty
+   %\let\resethooks=\empty
+   \orighscode\def\hscode{\endgroup\def\@currenvir{hscode}}}%
+  {\origendhscode
+   \global\let\hscode=\orighscode
+   \global\let\endhscode=\origendhscode}%
+
+\makeatother
+\EndFmtInput
+%
+
+\usepackage[utf8x]{inputenc}
+\usepackage[parfill]{parskip}
+\usepackage{amsmath,amsthm,amssymb,stmaryrd}
+\usepackage{cite}
+
+\title{Experimentation project report: \\
+Translating Haskell programs to Coq programs}
+
+\author{Gabe Dijkstra}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+
+Suppose we want to verify software written in Haskell using a proof
+assistant like Coq. Before we can begin with the verification process,
+we need to model our software in the proof assistant's specification
+language. Manual translation of Haskell code into Coq's Gallina code
+is a tedious job and more importantly, it is prone to subtle mistakes.
+The goal of this experimentation project is to find an answer to the
+following question:
+
+\begin{quote}
+  ``Can we automate the process of translating Haskell code into a Coq
+  script?''
+\end{quote}
+
+
+
+\section{Supported language fragment}
+
+Since Haskell is a language with a lot of features, it is unrealistic
+to expect that we can support every single one of them right away. The
+language fragment that we aim to support is Haskell 98 without the
+following features:
+
+\begin{itemize}
+\item typeclasses
+\item do-notation and list comprehensions
+\item record syntax
+\end{itemize}
+
+\section{Parametric polymorphism}
+
+Coq's type theory doesn't have parametric polymorphism, however, we
+can simulate this using implicit parameters, e.g.:
+
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[B]{}\Varid{const}\mathbin{::}\Varid{a}\to \Varid{b}\to \Varid{a}{}\<[E]%
+\\
+\>[B]{}\Varid{const}\;\Varid{x}\;\anonymous \mathrel{=}\Varid{x}{}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+translates to:
+
+\begin{tabbing}\tt
+~Definition~const~\char123{}~a~b~\char58{}~Set~\char125{}~\char40{}x0~\char58{}~a\char41{}~\char40{}x1~\char58{}~b\char41{}~\char58{}~a~\char58{}\char61{}\\
+\tt ~~~~~~~~~~~~~~match~x0~\char44{}~x1~with\\
+\tt ~~~~~~~~~~~~~~~~\char124{}~x~\char44{}~\char95{}~\char61{}\char62{}~x\\
+\tt ~~~~~~~~~~~~~~end\char46{}
+\end{tabbing}
+
+The parameters \text{\tt a} and \text{\tt b} are implicit and usually need not
+be provided when calling the function \text{\tt const}. There are however
+cases where Coq cannot infer the value of such implicit
+parameters. Consider the following example:
+
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[B]{}\Varid{s}\mathbin{::}(\Varid{a}\to \Varid{b}\to \Varid{c})\to (\Varid{a}\to \Varid{b})\to \Varid{a}\to \Varid{c}{}\<[E]%
+\\
+\>[B]{}\Varid{s}\;\Varid{p}\;\Varid{q}\;\Varid{r}\mathrel{=}\Varid{p}\;\Varid{r}\;(\Varid{q}\;\Varid{r}){}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\Varid{k}\mathbin{::}\Varid{a}\to \Varid{b}\to \Varid{a}{}\<[E]%
+\\
+\>[B]{}\Varid{k}\;\Varid{x}\;\anonymous \mathrel{=}\Varid{x}{}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\Varid{i}\mathbin{::}\Varid{a}\to \Varid{a}{}\<[E]%
+\\
+\>[B]{}\Varid{i}\mathrel{=}\Varid{s}\;\Varid{k}\;\Varid{k}{}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+Coq will not be able to infer the type parameter \ensuremath{\Varid{b}} of the second
+call to \ensuremath{\Varid{k}} in the definition of \ensuremath{\Varid{i}}. If we do the type checking by
+hand, we will notice that we can fill in any type we want in that
+position, no matter what arguments \ensuremath{\Varid{i}} gets.
+
+\section{General recursion}
+
+Since Coq only allows structural recursion, not all recursive Haskell
+definitions can translated directly into Gallina. In order to deal
+with some of these cases, we can generate Bove-Capretta predicates
+from the original function definition and rewrite the function
+definition using this predicate.
+
+With the ``bc'' pragma we can specify of which definitions we want to
+generate Bove-Capretta predicates:
+
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{19}{@{}>{\hspre}c<{\hspost}@{}}%
+\column{19E}{@{}l@{}}%
+\column{22}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[B]{}\text{\{-\# OPTIONS\_Hs2Gallina bc: quicksort \#-\}}{}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\mathbin{...}{}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\Varid{quicksort}\mathbin{::}[\mskip1.5mu \Conid{Nat}\mskip1.5mu]\to [\mskip1.5mu \Conid{Nat}\mskip1.5mu]{}\<[E]%
+\\
+\>[B]{}\Varid{quicksort}\;[\mskip1.5mu \mskip1.5mu]{}\<[19]%
+\>[19]{}\mathrel{=}{}\<[19E]%
+\>[22]{}[\mskip1.5mu \mskip1.5mu]{}\<[E]%
+\\
+\>[B]{}\Varid{quicksort}\;(\Varid{x}\mathbin{:}\Varid{xs}){}\<[19]%
+\>[19]{}\mathrel{=}{}\<[19E]%
+\>[22]{}\Varid{quicksort}\;(\Varid{filter}\;(\mathbin{<}\Varid{x})\;\Varid{xs})\plus {}\<[E]%
+\\
+\>[22]{}\Varid{quicksort}\;(\Varid{filter}\;(\geq \Varid{x})\;\Varid{xs}){}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+This method does not work well with nested recursion as we will need
+to simultaneously define the predicate and the function, which is
+something that cannot be done in Coq.
+
+\section{Coinduction}
+
+Another limitation of a direct translation is that in Coq there is a
+distinction between inductive and coinductive data types. If we for
+example want to work with infinite lists in Coq, we have to make a
+separate coinductive data type. With the ``codata'' and ``cofix''
+pragmas, we can indicate that we want a coinductive translation of our
+definitions.
+
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[B]{}\text{\{-\# OPTIONS\_Hs2Gallina codata: Stream \#-\}}{}\<[E]%
+\\
+\>[B]{}\text{\{-\# OPTIONS\_Hs2Gallina cofix: zeroes  \#-\}}{}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\mathbin{...}{}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\mathbf{data}\;\Conid{Stream}\;\Varid{a}\mathrel{=}\Conid{Cons}\;\Varid{a}\;(\Conid{Stream}\;\Varid{a}){}\<[E]%
+\\[\blanklineskip]%
+\>[B]{}\Varid{zeroes}\mathbin{::}\Conid{Stream}\;\Conid{Nat}{}\<[E]%
+\\
+\>[B]{}\Varid{zeroes}\mathrel{=}\Conid{Cons}\;\mathrm{0}\;\Varid{zeroes}{}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+would translate to:
+
+\begin{tabbing}\tt
+~CoInductive~Stream~\char40{}a~\char58{}Set\char41{}~\char58{}~Set~\char58{}\char61{}\\
+\tt ~~~\char124{}~Cons~\char58{}~a~\char45{}\char62{}~Stream~a~\char45{}\char62{}~Stream~a\char46{}\\
+\tt ~\\
+\tt ~CoFixpoint~zeroes~\char58{}~Stream~Nat~\char58{}\char61{}\\
+\tt ~~~Cons~0~zeroes\char46{}
+\end{tabbing}
+
+% note that we have left out some implicit argument stuff.
+
+Just as we have restrictions as to what recursive definitions we can
+specify in Coq, we have similar restrictions for corecursive
+definitions: every corecursive call should be \emph{guarded} by a
+constructor. Our tool will not check whether this is the case and will
+just blindly translate the Haskell definitions.
+
+
+\section{Modules}
+
+Since one probably will only verify a single Haskell module,
+pretending all the imported functions have already been verified. We
+want the tool to facilitate this strategy. For example, generate
+appropriate axioms for the imported definitions, such that if we
+extract the Haskell module from the Coq script, we can plug it back in
+our Haskell software without having to change the resulting code
+manually.
+
+
+
+
+\end{document}
