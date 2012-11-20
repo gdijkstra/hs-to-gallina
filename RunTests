@@ -6,7 +6,7 @@ echo "Removing all temporary files."
 rm -f *.glob *.v *.vo extracted/*
 
 # Test stuff that should work.
-positiveTests="Log.hs Quicksort.hs Notation.hs"
+positiveTests="Log.hs Quicksort.hs Notation.hs Coinduction.hs"
 success=0
 total=0
 
