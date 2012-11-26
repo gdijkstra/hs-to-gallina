@@ -6,6 +6,9 @@
 \usepackage[parfill]{parskip}
 \usepackage{amsmath,amsthm,amssymb,stmaryrd}
 \usepackage{cite}
+\usepackage{todonotes}
+
+\newcommand{todoi}[1]{\todo[inline]{#1}}
 
 \title{Experimentation project report: \\
 Translating Haskell programs to Coq programs}
@@ -18,13 +21,13 @@ Translating Haskell programs to Coq programs}
 
 \maketitle
 
-% Abstract?
+\todoi{Abstract?}
 
 \section{Introduction}
 \label{sec:intro}
 
-% Motivate problem some more: Haskell's type system is nice, but not
-% expressive enough for actual verification.
+\todoi{Motivate problem some more: Haskell's type system is nice, but not
+expressive enough for actual verification.}
 
 Suppose we want to verify software written in Haskell using a proof
 assistant like Coq. Before we can begin with the verification process,
@@ -51,6 +54,18 @@ Haskell file, we will use the \verb+haskell-src-exts+ library. We will
 take the abstract syntax tree with all the sugar instead of
 translating for example an intermediate language like GHC Core.
 
+\todoi{Motivation for this? Hopefully more readable code and
+  proofs (we can more or less do the equational reasoning we are used
+  to). More importantly (?): Bove-Capretta and extraction.}
+
+\todoi{ Stress that we do not create a deep embedding of
+  Haskell in Coq, but really translate Haskell constructs to the
+  corresponding Gallina constructs (if they exist). A consequence of
+  this approach is that we reason about our Haskell program as if it
+  were total and strict.  Coq will complain about missing patterns and
+  non-structural recursion. Ways around this: section~\ref{sec:bcmethod} and
+  section~\ref{sec:coind}.}
+
 Since Haskell is a language with a lot of features, it is unrealistic
 to expect that we can support every single one of them right away. The
 language fragment that we aim to support is Haskell 98 without at
@@ -58,51 +73,63 @@ least the following features:
 
 \begin{itemize}
 \item type classes
-\item do-notation and list comprehensions
+\item |do|-notation
+\item list comprehensions
 \item record syntax
 \item infix notation
 \item tuple syntax
+\item guards
 \end{itemize}
 
-% Give some more motivation as to why these particular things are not
-% supported?
+Even though Coq currently does have some notion of type classes, it is
+very experimental and therefore we have chosen to disregard type
+classes. Since |do|-notation depends on type classes, we also do not
+support this.
 
-% Say something about popular extensions not supported? Or should that
-% be clear?
+The other features that we do not support are all relatively
+straightforward to implement. 
+
+\todoi{But have not been implemented due to time constraints. Although
+  infix notation: needs some work with generating names and such and
+  translating priorities.}
 
 Later on it will become clear that we also need some further
-restrictions on our language to make it all work.
+restrictions on our language in some cases to make it all work. % rather vague sentence
 
 For the most part, Haskell's type system and syntax can be seen as a
 subset of that of Coq, so we can translate a lot of constructions in a
-very straight-forward manner. However, there are a couple of
-situations in which the two systems diverge:
+very straight-forward manner. However, in many places there are also
+subtleties and intricacies that we have to take care of. 
+% Which is the main focus of the following sections?
 
 % Something about assuming that the Haskell module is well-typed, has
 % type signatures and compiles!
 
-\begin{description}
-\item[Ordering/grouping definitions] In Coq, we can only reference
-  identifiers that have been defined previously. We need to order our
-  definitions according to the dependencies. In the case of mutually
-  recursive definitions, we need to group these definitions.
-\item[Pattern matching] In Haskell we can pattern match in a lot of
-  places, e.g. in lambdas (|\(x:xs) -> x|), in (top-level) definitions
-  (|(x:xs) = [a, b, c]|). In Coq we cannot do this, unless the
-  equation occurs in a \verb+let+-binding and the pattern happens to
-  be an irrefutable pattern.
-\item[Type signatures] Every top-level definition needs an explicit
-  type signature. Although we can of course infer those from the
-  Haskell code, we choose to assume that the user has provided these
-  type signatures already.
-\item[Parametric polymorphism] Coq does not have a notion of
-  parametric polymorphism. We can however fake it, up to a point.
-\item[Mutual recursion] We can deal with mutual recursion in Coq for
-  top-level definitions, but for local definitions occuring inside a
-  \verb+let+, we cannot have mutual recursion.
-\end{description}
+\section{Type signatures}
+\label{sec:typesigs}
 
-% Talk about handling of Prelude stuff.
+In Haskell we leave out type signatures and let the compiler figure
+out the type for us. For Coq's type system, type inference is
+undecidable, so we have to explicitly annotate at least our top-level
+definitions. Instead of doing the type inference ourselves, we assume
+that the user has written explicit type signatures for every top-level
+definition and use these annotations.
+
+\section{Data types}
+\label{sec:datatypes}
+
+% Normal vanilla Haskell data types can be straightforwardly translated
+
+% Note: name of constructor must not coincide with name of data type.
+
+% Note: negative data types are not allowed. Give examples of where
+% this can go wrong.
+
+% Note: least fixed point only. Coinduction see sec:coind.
+
+% Built-in support for lists.
+
+% Type synonyms can also be translated straightforwardly. 
 
 \section{Parametric polymorphism and implicit parameters}
 \label{sec:parampoly}
@@ -150,7 +177,26 @@ position, no matter what arguments |i| gets.
 % This is also reflected in the fact that if we look at the GHC Core
 % output, we will see that GHC fills in GHC.Prim.Any or something.
 
-\section{General recursion}
+% Manual solution: add GHC.Prim.Any thing to Coq prelude and use
+% explicit implicit parameter assignments. (How does this look in the
+% extracted Haskell code?)
+
+\section{Ordering definitions}
+
+% Ordering: topological ordering of dependency graph.
+
+% (Mutual) recursion: strongly connected components of dependency
+% graph. We need to explicitly group these mutual definitions with the
+% \verb+with+ constructor.
+
+% Mutual recursion in let bindings does not work.
+
+\section{Pattern matching}
+
+% Pattern bindings do not work as expected. Although we have
+% irrefutable patterns in Coq, we do not use that feature.
+
+\section{General recursion and partiality}
 \label{sec:genrec}
 
 % Explain problem, explain array of solutions, explain why we chose
@@ -159,10 +205,16 @@ position, no matter what arguments |i| gets.
 \subsection{Bove-Capretta method}
 \label{sec:bcmethod}
 
+% explain method
+
+% explain how nested recursion leads to induction-recursion and that
+% we cannot easily do this in Coq, in general.
+
+% for sake of simplicity, we only consider apps and vars: no case
+% expressions and guards. These can be added.
+
 \subsection{Implementation}
 \label{sec:bcimpl}
-
-% only allow apps and vars
 
 % generate inductive data type
 % details on Prop versus Set wrt extraction.
@@ -174,6 +226,11 @@ position, no matter what arguments |i| gets.
 
 \subsubsection{Inversion theorems}
 \label{sec:invthms}
+% Since the predicate is of sort Prop, we cannot pattern match on
+% inhabitants of this predicate, since the type of the result of the
+% function we are transforming is of sort Type. We need inversions
+% theorems to get around this.
+
 % Details on the inversion proofs and why they should work.
 
 % ltac script would be better, I guess?
@@ -184,6 +241,8 @@ position, no matter what arguments |i| gets.
 
 % Details of implementation: what do we restrict ourselves to? Type
 % synonyms stuff again.
+
+
 
 \subsubsection{Examples}
 \label{sec:bcexamples}
@@ -198,7 +257,7 @@ position, no matter what arguments |i| gets.
 Another limitation of a direct translation is that in Coq there is a
 distinction between inductive and coinductive data types. If we for
 example want to work with infinite lists in Coq, we have to make a
-separate coinductive data type. With the ``codata'' and ``cofix''
+separate coinductive data type. With the \verb+codata+ and \verb+cofix+
 pragmas, we can indicate that we want a coinductive translation of our
 definitions.
 
@@ -252,6 +311,19 @@ just blindly translate the Haskell definitions.
 % means): you verify stuff and you get something that's extracted with
 % the same computational behaviour, that should be good enough.
 
+\section{Prelude}
+\label{sec:prelude}
+
+% Show how we support some prelude stuff.
+% Of course we skip all the type class stuff
+
+% We also skip the obviously non-terminating stuff like iterate and
+% such.
+
+% We have to write our own B-C definitions of partial functions like
+% head and tail, but during extraction they get mapped to the Prelude
+% functions |head| and |tail|.
+
 \section{Related work}
 \label{sec:relatedwork}
 
@@ -271,9 +343,12 @@ just blindly translate the Haskell definitions.
 \section{Conclusion}
 \label{sec:conclusion}
 
-
 % Conclusion
 
 % It sort of works nicely? Step in the right direction?
+
+% Semantics: no idea. We need to trust extraction mechanism and our
+% Coq prelude stuff. afaik nothing has been proved about Coq's
+% extraction mechanism?
 
 \end{document}
