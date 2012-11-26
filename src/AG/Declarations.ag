@@ -32,6 +32,8 @@ sem Decl
      loc.declName = @matches.name
   | PatBind
      loc.declName = @pat.var
+  | TypeDecl
+     loc.declName = @name.name
 
 sem Decl                     
   | DataDecl 
@@ -55,8 +57,14 @@ sem Decl
                             , @declName
                             , @dependencies
                                     )
+  | TypeDecl
+     loc.declsDeps = return ( GallinaUngroupedTypeSyn $
+                              GallinaTypeSynBody @declName @params @ty.gallinaType
+                            , @declName
+                            , @dependencies
+                            )
 -- The following constructors are ignored.
- | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+ | TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
    GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
    SpliceDecl TypeSig ForImp ForExp RulePragmaDecl DeprPragmaDecl 
    WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 

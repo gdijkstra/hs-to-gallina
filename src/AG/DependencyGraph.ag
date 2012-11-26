@@ -1,11 +1,13 @@
 sem Decl                     
   | DataDecl 
      loc.dependencies = @qualcondecls.dependencies
+  | TypeDecl
+     loc.dependencies = @ty.dependencies
   | FunBind
      loc.dependencies = @matches.dependencies
   | PatBind
      loc.dependencies = @binds.dependencies
-                         ++ (@binds.names `difference` @rhs.dependencies)
+                        ++ (@binds.names `difference` @rhs.dependencies)
   | TypeSig
      loc.dependencies = typeDeps @ty.gallinaType
 
@@ -148,13 +150,13 @@ sem Decls
      lhs.names = @hd.names ++ @tl.names
 
 sem Decl                     
-  | DataDecl FunBind PatBind
+  | DataDecl FunBind PatBind TypeDecl
      lhs.names = [@declName]
   | TypeSig
      lhs.names = @names.names
                 
 -- The following constructors aren't implemented.
- | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+ | TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
    GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
    SpliceDecl ForImp ForExp RulePragmaDecl DeprPragmaDecl 
    WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 
@@ -162,17 +164,11 @@ sem Decl
      lhs.names = error "Unsupported declarations"
 
 sem Decl                     
-  | DataDecl 
-     lhs.dependencies = @dependencies
-  | FunBind
-     lhs.dependencies = @dependencies
-  | PatBind
-     lhs.dependencies = @dependencies
-  | TypeSig
+  | DataDecl FunBind PatBind TypeSig TypeDecl
      lhs.dependencies = @dependencies
 
 -- The following constructors aren't implemented.
- | TypeDecl TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
+ | TypeFamDecl GDataDecl DataFamDecl TypeInsDecl DataInsDecl 
    GDataInsDecl ClassDecl InstDecl DerivDecl InfixDecl DefaultDecl 
    SpliceDecl ForImp ForExp RulePragmaDecl DeprPragmaDecl 
    WarnPragmaDecl InlineSig InlineConlikeSig SpecSig SpecInlineSig 

@@ -18,9 +18,11 @@ type FunOrPatBody = Either GallinaFunctionBody GallinaPatBindingBody
 
 -- | Small subset of Vernacular commands.
 data VernacularCommand =
+  -- | Type synonym definition.
+  GallinaTypeSynonym GallinaTypeSynBody
   -- | Inductive data type definition. 'Bool' indicates whether it is
   -- coinductive ('True') or not ('False').
-  GallinaInductive [GallinaInductiveBody] Bool
+  | GallinaInductive [GallinaInductiveBody] Bool
   -- | Function definition (non-recursive).
   | GallinaFunction GallinaFunctionBody
   -- | Pattern binding definition (i.e. function with no arguments).
@@ -34,6 +36,19 @@ data VernacularCommand =
   | GallinaSetImplicit
   -- | ...and turn them off.
   | GallinaUnsetImplicit
+  deriving (Show, Eq)
+
+-- | Type synonym definition.
+data GallinaTypeSynBody =
+  GallinaTypeSynBody
+  {
+    -- | Type synonym name.
+    synonymName   :: String
+    -- | The type parameters of the type synonym.
+  , synonymParams :: [String]
+    -- | The right-hand side of the type synonym definition.
+  , synonymType   :: GallinaType
+  }
   deriving (Show, Eq)
 
 -- | Let definitions.

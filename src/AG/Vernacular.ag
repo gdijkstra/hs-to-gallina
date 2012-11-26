@@ -5,6 +5,7 @@
 data GallinaUngroupedDefinition =
   GallinaUngroupedInd GallinaInductiveBody
   | GallinaUngroupedFunOrPat FunOrPatBody
+  | GallinaUngroupedTypeSyn GallinaTypeSynBody
   deriving (Show, Eq)
 
 type DeclDeps =  [(GallinaUngroupedDefinition, String, [String])]
@@ -20,6 +21,7 @@ groupDefinitions (AcyclicSCC x) = toDef x
     toDef (GallinaUngroupedInd b              ) = GallinaInductive [b] False
     toDef (GallinaUngroupedFunOrPat (Left b)  ) = GallinaFunction b 
     toDef (GallinaUngroupedFunOrPat (Right b) ) = GallinaPatBinding b
+    toDef (GallinaUngroupedTypeSyn b          ) = GallinaTypeSynonym b
 groupDefinitions (CyclicSCC is@((GallinaUngroupedInd _):_)) = GallinaInductive (map toInd is) False
   where
     toInd (GallinaUngroupedInd b) = b
@@ -28,6 +30,7 @@ groupDefinitions (CyclicSCC is@((GallinaUngroupedFunOrPat _):_)) = GallinaFixpoi
   where
     toFix (GallinaUngroupedFunOrPat b) = b
     toFix _ = error "groupDefinitions: toFix: argument must be a function or pattern binding."
+groupDefinitions (CyclicSCC ((GallinaUngroupedTypeSyn _):_)) = error "groupDefinitions: recursive type synonyms are not allowed."
 groupDefinitions (CyclicSCC []) = error "groupDefinitions: CyclicSCC should have non-empty list argument."
 
 -- | Fetch the definition name of an ungrouped definition.
@@ -35,6 +38,7 @@ declName :: GallinaUngroupedDefinition -> String
 declName (GallinaUngroupedInd b              ) = inductiveName b
 declName (GallinaUngroupedFunOrPat (Left b)  ) = funName b
 declName (GallinaUngroupedFunOrPat (Right b) ) = patName b
+declName (GallinaUngroupedTypeSyn b          ) = synonymName b
 
 -- | Extract the dependencies from a type.
 typeDeps :: GallinaType -> [String]
@@ -57,11 +61,12 @@ typeDeps (GallinaTyTerm _        ) = error "typeDeps: terms should not occur her
 associateTypes :: Map String GallinaType -> DeclDeps -> DeclDeps 
 associateTypes types declDeps = map f declDeps
   where
-    f (def@(GallinaUngroupedInd _), name, deps) = (def, name, deps)
-    f ((GallinaUngroupedFunOrPat b), name, deps) = ( associateType name b
-                                                   , name
-                                                   , deps ++ typeDeps (ty name)
-                                                   )
+    f (def@(GallinaUngroupedInd _),     name, deps) = (def, name, deps)
+    f (def@(GallinaUngroupedTypeSyn _), name, deps) = (def, name, deps)
+    f ((GallinaUngroupedFunOrPat b),    name, deps) = ( associateType name b
+                                                      , name
+                                                      , deps ++ typeDeps (ty name)
+                                                      )
 
     associateType :: String -> FunOrPatBody -> GallinaUngroupedDefinition
     associateType n (Left b ) = GallinaUngroupedFunOrPat
@@ -139,12 +144,13 @@ groupLetDefinitions = map groupLetDefinition . stronglyConnComp
     groupLetDefinition :: SCC GallinaUngroupedDefinition -> GallinaLetDefinition
     groupLetDefinition (AcyclicSCC x) = toDef x
       where
-        toDef (GallinaUngroupedInd _              ) = error "groupLetDefinition: data types not allowed"
+
         toDef (GallinaUngroupedFunOrPat (Left b)  ) = GallinaLetFunction b
         toDef (GallinaUngroupedFunOrPat (Right b) ) = GallinaLetPatBinding b
-    groupLetDefinition (CyclicSCC ((GallinaUngroupedInd _):_)) = error "groupLetDefinition: data types not allowed"
+        toDef _                                     = error "groupLetDefinition: data types/type synonyms not allowed here."
+    groupLetDefinition (CyclicSCC ((GallinaUngroupedInd _):_)) = error "groupLetDefinition: data types not allowed here."
     groupLetDefinition (CyclicSCC [GallinaUngroupedFunOrPat b]) = GallinaLetFixpoint b
-    groupLetDefinition (CyclicSCC _) = error "groupLetDefinition: CyclicSCC should have list argument of length 1."
+    groupLetDefinition (CyclicSCC _) = error "groupLetDefinition: no mutual recursion allowed in let/where definitions."
 
 }
 
@@ -155,4 +161,4 @@ sem Binds
   | BDecls
      lhs.definitions = groupLetDefinitions @decls.declsDeps
   | IPBinds
-     lhs.definitions = error "Implicit parameters unsupported"
+     lhs.definitions = error "Implicit parameters are not supported."

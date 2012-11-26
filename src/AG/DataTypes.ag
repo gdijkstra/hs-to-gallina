@@ -1,11 +1,13 @@
--- Conversion of data type definitions
+-- Conversion of data type and type synonym definitions.
 
 sem Decl
   | DataDecl
      loc.indName = @name.name
      loc.params = @tyvarbinds.params
      loc.constrs = @qualcondecls.constrs
-              
+  | TypeDecl
+     loc.params = @tyvarbinds.params
+
 attr QualConDecls
   syn constrs :: {[GallinaConstructor]}
 

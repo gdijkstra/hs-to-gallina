@@ -46,15 +46,32 @@ instance Pp VernacularDocument where
               ]
 
 instance Pp VernacularCommand where
-  pp (GallinaInductive is False) = ppGroupDotted "Inductive" is
-  pp (GallinaInductive is True) = ppGroupDotted "CoInductive" is
-  pp (GallinaFixpoint is False) = ppGroupDotted "Fixpoint" is
-  pp (GallinaFixpoint is True) = ppGroupDotted "CoFixpoint" is
-  pp (GallinaFunction b  ) = ppGroupDotted "Definition" [b]
-  pp (GallinaPatBinding b) = ppGroupDotted "Definition" [b]
-  pp (GallinaThmDef d    ) = pp d
-  pp GallinaSetImplicit    = text "Set Implicit Arguments."
-  pp GallinaUnsetImplicit  = text "Unset Implicit Arguments."
+  pp (GallinaInductive is False ) = ppGroupDotted "Inductive" is
+  pp (GallinaInductive is True  ) = ppGroupDotted "CoInductive" is
+  pp (GallinaFixpoint is False  ) = ppGroupDotted "Fixpoint" is
+  pp (GallinaFixpoint is True   ) = ppGroupDotted "CoFixpoint" is
+  pp (GallinaTypeSynonym b      ) = ppGroupDotted "Definition" [b]
+  pp (GallinaFunction b         ) = ppGroupDotted "Definition" [b]
+  pp (GallinaPatBinding b       ) = ppGroupDotted "Definition" [b]
+  pp (GallinaThmDef d           ) = pp d
+  pp GallinaSetImplicit           = text "Set Implicit Arguments."
+  pp GallinaUnsetImplicit         = text "Unset Implicit Arguments."
+
+instance Pp GallinaTypeSynBody where
+  pp a = hsep [ text (synonymName a)
+              , params
+              , text ":"
+              , pp GallinaTySet
+              , text ":="
+              ]
+         <+>
+         pp (synonymType a)
+
+    where
+      params = if not (null pars)
+               then hsep [lparen, hsep (map text pars), text ": Set", rparen]
+               else empty
+      pars   = synonymParams a
 
 instance Pp GallinaLetDefinition where
   pp (GallinaLetFixpoint b   ) = text "fix" <+> pp b

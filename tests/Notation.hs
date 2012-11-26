@@ -24,3 +24,12 @@ test (x:_) = [x]
 
 bcListTest :: [a] -> [a]
 bcListTest xs = concat (bcListTest xs : [concat [test (bcListTest xs), bcListTest xs]])
+
+-- Data type test
+data MyData a b c = MyData0
+                  | MyData1 a
+                  | MyData2 a b
+                  | MyData3 (MyData b c a) (MyData a c b) (MyData b a c) (MyData c a b) (MyData c b a)
+
+-- Type synonym test
+type MyType a = MyData a a a
