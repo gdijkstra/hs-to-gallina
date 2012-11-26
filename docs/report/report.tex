@@ -367,23 +367,72 @@ definitions. Instead of doing the type inference ourselves, we assume
 that the user has written explicit type signatures for every top-level
 definition and use these annotations.
 
-\section{Data types}
+\section{Data types and type synonyms}
 \label{sec:datatypes}
 
-\todoi{``Normal'' Haskell data types can be straightforwardly
-  translated.}
+Haskell data types can be straightforwardly translated. For example:
 
-\todoi{Note: name of constructor must not coincide with name of data
-  type.}
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[B]{}\mathbf{data}\;\Conid{List}\;\Varid{a}\mathrel{=}\Conid{Nil}\mid \Conid{Cons}\;\Varid{a}\;(\Conid{List}\;\Varid{a}){}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+translates to:
+
+\begin{tabbing}\tt
+~Inductive~List~\char40{}~a~\char58{}~Set~\char41{}~\char58{}~Set~\char58{}\char61{}\\
+\tt ~~~~~~~~~~~\char124{}~Nil~\char58{}~List~a\\
+\tt ~~~~~~~~~~~\char124{}~Cons~\char58{}~a~\char45{}\char62{}~List~a~\char45{}\char62{}~List~a\char46{}
+\end{tabbing}
+
+One important thing to note here is that since in Coq, names of data
+constructors cannot coincide with the name of the data type itself,
+since both can be used in exactly the same places.
+
+Type synonyms can also be translated easily:
+
+\begin{hscode}\SaveRestoreHook
+\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{3}{@{}>{\hspre}l<{\hspost}@{}}%
+\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
+\>[3]{}\mathbf{type}\;\Conid{SillySynonym}\;\Varid{a}\;\Varid{b}\;\Varid{c}\mathrel{=}\Conid{Silly}\;\Varid{b}\;\Varid{c}{}\<[E]%
+\ColumnHook
+\end{hscode}\resethooks
+
+becomes:
+
+\begin{tabbing}\tt
+~Definition~SillySynonym~\char40{}~a~b~c~\char58{}~Set~\char41{}~\char58{}~Set~\char58{}\char61{}~Silly~b~c\char46{}
+\end{tabbing}
+
+\subsection{List notation}
+\label{sec:listnotation}
+
+\todoi{Built-in support for lists: it is supported in patterns and
+  terms, but gets translated to conses and nils, even though we have
+  support for that in Coq. But the extracted code uses conses and nils
+  everywhere...}
+
+\subsection{Negative data types}
+\label{sec:negative}
 
 \todoi{Note: negative data types are not allowed. Give examples of
   where this can go wrong.}
 
-\todoi{Note: least fixed point only. Coinduction see section~\ref{sec:coind}.}
+\subsection{Coinductive types}
 
-\todoi{Built-in support for lists.}
+In Haskell, we do not make a distinction between inductive and
+coinductive interpretations of data type definitions, e.g. the list
+type both has finite lists as infinite lists (or streams) as its
+inhabitants. In Coq there is a clear distinction between these two
+interpretations. The translation given above reads the data type as an
+inductive definition, so we are only allowed to give finite
+inhabitants of that data type.
 
-\todoi{Type synonyms can also be translated straightforwardly. }
+If we want to deal with infinite data structures, we then need to use
+coinduction, which we will deal with in section~\ref{sec:coind}.
 
 \section{Parametric polymorphism and implicit parameters}
 \label{sec:parampoly}
@@ -391,7 +440,7 @@ definition and use these annotations.
 \todoi{Also mention the contextual implicit stuff and data type
   constructors.}
 
-Coq's type theory doesn't have parametric polymorphism, however, we
+Coq's type theory does not have parametric polymorphism, however, we
 can simulate this using implicit parameters, e.g.:
 
 \begin{hscode}\SaveRestoreHook
