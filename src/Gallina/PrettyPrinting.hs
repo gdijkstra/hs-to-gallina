@@ -165,7 +165,8 @@ instance Pp GallinaPat where
   ppPrec _ GallinaPWildCard    = text "_"
 
 instance Pp GallinaType where
-  ppPrec p (GallinaTyForall s ty) = parensIf (p > 0) $ hsep [text "forall", hsep . map text $ s, text ",", pp ty]
+  ppPrec _ (GallinaTyForall _ ty) = pp ty
+--  ppPrec p (GallinaTyForall s ty) = parensIf (p > 0) $ hsep [text "forall", hsep . map text $ s, text ",", pp ty]
   ppPrec p (GallinaTyFun l r    ) = parensIf (p > 0) $ ppPrec 1 l <+> text "->" <+> pp r
   ppPrec p (GallinaTyApp l r    ) = parensIf (p > 1) $ pp l <+> ppPrec 2 r
   ppPrec _ (GallinaTyVar s      ) = text s
