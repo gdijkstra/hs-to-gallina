@@ -68,8 +68,8 @@ translating for example an intermediate language like GHC Core.
 
 Since Haskell is a language with a lot of features, it is unrealistic
 to expect that we can support every single one of them right away. The
-language fragment that we aim to support is Haskell 98 without at
-least the following features:
+language fragment that we support is Haskell 98 without the following
+features:
 
 \begin{itemize}
 \item type classes
@@ -86,12 +86,8 @@ very experimental and therefore we have chosen to disregard type
 classes. Since |do|-notation depends on type classes, we also do not
 support this.
 
-The other features that we do not support are all relatively
-straightforward to implement. 
-
-\todoi{But have not been implemented due to time constraints. Although
-  infix notation: needs some work with generating names and such and
-  translating priorities.}
+The other features that we do not support should all be relatively
+straightforward to implement.
 
 For the most part, Haskell's type system and syntax coincide with a
 subset of that of Coq, so we can translate a lot of constructions in a
@@ -145,49 +141,52 @@ Definition SillySynonym ( a b c : Set ) : Set := Silly b c.
 \subsection{List notation}
 \label{sec:listnotation}
 
-\todoi{Built-in support for lists: it is supported in patterns and
-  terms, but gets translated to conses and nils, even though we have
-  support for that in Coq. But the extracted code uses conses and nils
-  everywhere...}
+Our tool supports Haskell's built-in list notation. We can support it
+at the type-level (e.g. |[a]|) and at the term and pattern level
+(e.g. |[a,b,c]|, |a:b:[c]|, |[]|). For the terms and patterns we
+translate the infix notation to prefix notation in order to simplify
+the code that generates the missing patterns, so we do not have to
+deal with a single pattern having multiple representations.
 
 \subsection{Strictly positive data types}
 \label{sec:negative}
 
+Coq does not allow us to have negative recursive positions in our data
+types, whereas Haskell. To illustrate why we do not want this in a
+system like Coq, we will try to express the following lambda terms
+using a negative data type in Haskell:
+
+\begin{eqnarray*}
+  \omega &=& \lambda x . x x \\
+  \Omega &=& \omega \omega
+\end{eqnarray*}
+
+If we perform a $\beta$-reduction on $\Omega$, we will get $\Omega$
+again. We can keep on doing this indefinitely: $\Omega$ has no normal
+form.
+
 Consider the following Haskell data type:
 
 \begin{code}
-  data Bad = BadConstr (Bad -> Bad)
+  data Term = Lam (Term -> Term)
 \end{code}
 
-If we translate this as follows:
-
-\begin{verbatim}
-Inductive Bad : Set :=
-          | BadConstr : (Bad -> Bad) -> Bad.
-\end{verbatim}
-
-we will get the following error message:
-
-\begin{verbatim}
-Error: Non strictly positive occurrence of "Bad" in "(Bad -> Bad) -> Bad".
-\end{verbatim}
-
-Coq does not allow such definitions, as it enables us to write terms
-that do not have a normal form or even terms of type \verb+False+,
-which would make the entire system useless.
-
-Using the |Bad| example, we can write the following:
+Using this data type we can write the following:
 
 \begin{code}
-  omega :: Bad -> Bad
-  omega f = (case f of (BadConstr x) -> x) f
+  omega :: Term -> Term
+  omega f = (case f of (Lam x) -> x) f
 
-  loop :: Bad
-  loop = omega (BadConstr omega)
+  loop :: Term
+  loop = omega (Lam omega)
 \end{code}
 
-Reducing |loop| we eventually reduce to |loop| again and can keep on
-doing this indefinitely: |loop| has no normal form.
+We can see the exact same thing happening with |loop| as with
+$\Omega$: after a couple of reduction steps |loop| reduces to |loop|.
+
+Allowing negative data types in Coq means that we can construct terms
+that have no normal form and also terms of type \verb+False+, which
+would make the whole system useless.
 
 Our tool does not check for these kind of constraints on data types.
 
@@ -207,9 +206,6 @@ coinduction, which we will deal with in section~\ref{sec:coind}.
 \section{Parametric polymorphism and implicit parameters}
 \label{sec:parampoly}
 
-\todoi{Also mention the contextual implicit stuff and data type
-  constructors.}
-
 Coq's type theory does not have parametric polymorphism, however, we
 can simulate this using implicit parameters, e.g.:
 
@@ -227,9 +223,29 @@ Definition const { a b : Set } (x0 : a) (x1 : b) : a :=
              end.
 \end{verbatim}
 
-The parameters \verb+a+ and \verb+b+ are implicit and usually need not
-be provided when calling the function \verb+const+. There are however
-cases where Coq cannot infer the value of such implicit
+The parameters \verb+a+ and \verb+b+ are implicit and need not be
+provided when calling the function \verb+const+.
+
+We also need implicit parameters for data constructors. If we for
+example have the following data type:
+
+\begin{verbatim}
+Inductive List ( a : Set ) : Set :=
+          | Nil : List a
+          | Cons : a -> List a -> List a.
+\end{verbatim}
+
+then the type of \verb+Cons+ is 
+
+\begin{verbatim}
+Cons : forall a : Set, a -> List a -> List a
+\end{verbatim}
+
+This means that every time we call \verb+Cons+, we have to specify the
+type \verb+a+. Using the contextual implicit parameters option, we can
+tell Coq to infer these parameters instead.
+
+There are cases where Coq cannot infer the value of the implicit
 parameters. Consider the following example:
 
 \begin{code}
@@ -246,14 +262,22 @@ i = s k k
 Coq will not be able to infer the type parameter |b| of the second
 call to |k| in the definition of |i|. If we do the type checking by
 hand, we will notice that we can fill in any type we want in that
-position, no matter what arguments |i| gets. 
+position, no matter what arguments |i| gets. GHC solves this
+``problem'' by filling in the type |GHC.Prim.Any|. We can do something
+similar in Coq, by defining a type \verb+Any+ as the empty type,
+i.e. it is isomorphic to \verb+Logic.False+ and manually filling in
+the parameters it could not figure out:
 
-\todoi{This is also reflected in the fact that if we look at the GHC
-  Core output, we will see that GHC fills in GHC.Prim.Any.}
+\begin{verbatim}
+Inductive Any : Set := .
 
-\todoi{Manual solution: add GHC.Prim.Any thing to Coq prelude and use
-  explicit implicit parameter assignments. (How does this look in the
-  extracted Haskell code?)}
+Definition i { a : Set } : a -> a :=
+             s k (k (b:=Any)).
+\end{verbatim}
+
+Filling in these implicit parameters explicitly can be automated, but
+this means that we have to implement a type inference mechanism for
+Haskell, which we refrained from doing.
 
 \section{Ordering definitions}
 
@@ -286,12 +310,26 @@ mutually recursive local definitions.
 
 \section{Pattern matching}
 
-Haskell allows us to pattern match in a lot of places.
+Haskell allows us to pattern match in a lot of places. In some cases
+this does not map nicely to Gallina constructs. For example, when
+writing a lambda expression, we are allowed to immediately pattern
+match on the argument, e.g. |\(x,y) -> x|. In Gallina we would have to
+write something like:
 
-\todoi{lambda expressions}
-\todoi{function definitions}
-\todoi{pattern bindings (these only make sense in let statements in coq and even then only if they are irrefutable)}
-\todoi{case statements (obviously)}
+\begin{verbatim}
+ fun xy => match xy with (x,y) => x end}.
+\end{verbatim}
+
+Instead of translating it this way, we assume that the patterns
+occurring in lambda expressions are variables. Our tool will throw an
+error if it encounters any other pattern.
+
+Another situation in which we can pattern match are pattern bindings,
+e.g. |(x,y) = e|. Coq has some support for these bindings if the
+pattern on the left hand side happens to be an irrefutable pattern and
+the definition happens to be inside a \verb+let+ construct. We cannot
+do this for top-level definitions, so for pattern bindings we again
+assume that the pattern occurring on the left hand side is a variable.
 
 \section{General recursion and partiality}
 \label{sec:genrec}
