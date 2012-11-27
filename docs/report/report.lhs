@@ -150,11 +150,46 @@ Definition SillySynonym ( a b c : Set ) : Set := Silly b c.
   support for that in Coq. But the extracted code uses conses and nils
   everywhere...}
 
-\subsection{Negative data types}
+\subsection{Strictly positive data types}
 \label{sec:negative}
 
-\todoi{Note: negative data types are not allowed. Give examples of
-  where this can go wrong.}
+Consider the following Haskell data type:
+
+\begin{code}
+  data Bad = BadConstr (Bad -> Bad)
+\end{code}
+
+If we translate this as follows:
+
+\begin{verbatim}
+Inductive Bad : Set :=
+          | BadConstr : (Bad -> Bad) -> Bad.
+\end{verbatim}
+
+we will get the following error message:
+
+\begin{verbatim}
+Error: Non strictly positive occurrence of "Bad" in "(Bad -> Bad) -> Bad".
+\end{verbatim}
+
+Coq does not allow such definitions, as it enables us to write terms
+that do not have a normal form or even terms of type \verb+False+,
+which would make the entire system useless.
+
+Using the |Bad| example, we can write the following:
+
+\begin{code}
+  omega :: Bad -> Bad
+  omega f = (case f of (BadConstr x) -> x) f
+
+  loop :: Bad
+  loop = omega (BadConstr omega)
+\end{code}
+
+Reducing |loop| we eventually reduce to |loop| again and can keep on
+doing this indefinitely: |loop| has no normal form.
+
+Our tool does not check for these kind of constraints on data types.
 
 \subsection{Coinductive types}
 
@@ -222,18 +257,41 @@ position, no matter what arguments |i| gets.
 
 \section{Ordering definitions}
 
-\todoi{Ordering: topological ordering of dependency graph.}
+When writing definitions in Coq, we can only use terms that have been
+defined previously. In the case of recursive functions, we need to
+explicitly mark it as such, using the \verb+Fixpoint+ command.
 
-\todoi{(Mutual) recursion: strongly connected components of
-  dependency graph. We need to explicitly group these mutual
-  definitions with the \verb+with+ constructor.}
+In Haskell, the ordering of our definitions does not matter, so when
+translating we need to order the definitions ourselves and check
+whether they are recursive or not. This corresponds to finding all the
+strongly connected components of the dependency graph in a topological
+order.
 
-\todoi{Mutual recursion in let bindings does not work.}
+If such a strongly connected component consists of more than one
+definition, we have mutually recursive definitions. Coq supports these
+constructions by grouping the definitions together with the
+\verb+with+ keyword. We can only group functions with other functions
+and data types with other data types. However, since Haskell does not
+allow us to write data types and functions that mutually depend on
+eachother, this is not a problem.
+
+\subsection{Recursion in |let|-bindings}
+\label{sec:reclet}
+
+Just as with top-level definitions, local definitions inside |let|s
+and |where|s need to be ordered and grouped. For recursive definitions
+we have the \verb+let fix+ construct, but this does not extend to
+mutually recursive definitions. Our tool therefore does not support
+mutually recursive local definitions.
 
 \section{Pattern matching}
 
-\todoi{Pattern bindings do not work as expected. Although we have
-  irrefutable patterns in Coq, we do not use that feature.}
+Haskell allows us to pattern match in a lot of places.
+
+\todoi{lambda expressions}
+\todoi{function definitions}
+\todoi{pattern bindings (these only make sense in let statements in coq and even then only if they are irrefutable)}
+\todoi{case statements (obviously)}
 
 \section{General recursion and partiality}
 \label{sec:genrec}
