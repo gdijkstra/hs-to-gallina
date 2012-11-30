@@ -29,6 +29,9 @@ Translating Haskell programs to Coq programs}
 \todoi{Motivate problem some more: Haskell's type system is nice, but not
 expressive enough for actual verification.}
 
+\todoi{Something about assuming that you have a nice test suite that
+  you want to verify.}
+
 Suppose we want to verify software written in Haskell using a proof
 assistant like Coq. Before we can begin with the verification process,
 we need to model our software in the proof assistant's specification
@@ -48,23 +51,18 @@ following questions:
 \section{Method}
 \label{sec:method}
 
-We will use Haskell along with the {\sc UUAG} system to implement a
-translation of a Haskell module into a Coq script. To parse the
-Haskell file, we will use the \verb+haskell-src-exts+ library. We will
-take the abstract syntax tree with all the sugar instead of
-translating for example an intermediate language like GHC Core.
+\todoi{Use Haskell and UUAG. Use haskell-src-exts to get AST with all
+  sugar -> map this to corresponding Gallina. Why not GHC core?
+  Hopefully better reasoning more readable everything. Why use Gallina
+  directly instead of making an embedding? We get all the checking
+  stuff for structural recursion and all that for free and extraction
+  would work better. Downside is that we cannot do lazy stuff, however
+  we do have section on coind.. Maybe motivate something about why
+  reasoning about a lazy program as though it were strict just works?
+  Or even worse: reasoning about it as if it were total!}
 
-\todoi{Motivation for this? Hopefully more readable code and
-  proofs (we can more or less do the equational reasoning we are used
-  to). More importantly (?): Bove-Capretta and extraction.}
-
-\todoi{ Stress that we do not create a deep embedding of
-  Haskell in Coq, but really translate Haskell constructs to the
-  corresponding Gallina constructs (if they exist). A consequence of
-  this approach is that we reason about our Haskell program as if it
-  were total and strict.  Coq will complain about missing patterns and
-  non-structural recursion. Ways around this: section~\ref{sec:bcmethod} and
-  section~\ref{sec:coind}.}
+\subsection{Supported language fragment}
+\label{sec:supportedlang}
 
 Since Haskell is a language with a lot of features, it is unrealistic
 to expect that we can support every single one of them right away. The
@@ -72,6 +70,7 @@ language fragment that we support is Haskell 98 without the following
 features:
 
 \begin{itemize}
+\item modules
 \item type classes
 \item |do|-notation
 \item list comprehensions
@@ -185,8 +184,9 @@ We can see the exact same thing happening with |loop| as with
 $\Omega$: after a couple of reduction steps |loop| reduces to |loop|.
 
 Allowing negative data types in Coq means that we can construct terms
-that have no normal form and also terms of type \verb+False+, which
-would make the whole system useless.
+that have no normal form. Constructions like the above can be used to
+define terms of type \verb+False+, which would make the whole system
+useless.
 
 Our tool does not check for these kind of constraints on data types.
 
@@ -317,7 +317,7 @@ match on the argument, e.g. |\(x,y) -> x|. In Gallina we would have to
 write something like:
 
 \begin{verbatim}
- fun xy => match xy with (x,y) => x end}.
+ fun xy => match xy with (x,y) => x end
 \end{verbatim}
 
 Instead of translating it this way, we assume that the patterns
@@ -388,15 +388,18 @@ we cannot easily do this in Coq, in general.}
 \todoi{Refine tactic example for how to use stuff. (Find a nice
   example that I encountered in verification challenge?)}
 
+\todoi{We can automatically generate these refine tactic things, but
+  it does not work nicely with mutually recursive things.}
+
 \section{Coinduction}
 \label{sec:coind}
 
 Another limitation of a direct translation is that in Coq there is a
 distinction between inductive and coinductive data types. If we for
 example want to work with infinite lists in Coq, we have to make a
-separate coinductive data type. With the \verb+codata+ and \verb+cofix+
-pragmas, we can indicate that we want a coinductive translation of our
-definitions.
+separate coinductive data type. With the \verb+codata+ and
+\verb+cofix+ pragmas, we can indicate that we want a coinductive
+translation of our top-level definitions.
 
 \begin{code}
 {-"\text{\{-\# OPTIONS\_Hs2Gallina codata: Stream \#-\}}"-}
@@ -427,38 +430,55 @@ definitions: every corecursive call should be \emph{guarded} by a
 constructor. Our tool will not check whether this is the case and will
 just blindly translate the Haskell definitions.
 
-\todoi{Coinduction stuff as a nice extra. Talk about how we don't
-  check guardedness and no mixing of induction and coinduction.}
-
 \section{Extraction}
 \label{sec:extraction}
 
-\todoi{Talk about how we want to check whether this is still the same
-  code. Generating QuickCheck tests to compare programs seems rather
-  involved. Unless you make a lot of assumptions. What would be fun to
-  have a mapping from QuickCheck properties to Coq properties and
-  back? Very much future work. Do we have any guarantees that
-  extraction will yield something with the same semantics as the Coq?
-  If so, then we needn't care about the fact that our own translation
-  might not preserve semantics (up to strictness, whatever that
-  means): you verify stuff and you get something that's extracted with
-  the same computational behaviour, that should be good enough.}
+Once we have verified and possibly modified the Gallina code, such
+that it actually satisfies the properties we wanted to prove, we can
+translate the code back to Haskell using Coq's extraction mechanism. 
 
-\todoi{Coq needs to update its extraction stuff. Produces broken
-  Haskell...}
+Since Coq's type system does not map nicely to Haskell's, it sometimes
+uses |unsafeCoerce| to convince GHC's type checker. However, Coq
+produces broken Haskell code when it needs |unsafeCoerce|. Luckily
+this is just a minor syntactic fault that we can fix by a very simple
+\verb+sed+ script. But this is not really nice. And |unsafeCoerce|
+should not be needed.
 
 \section{Prelude}
 \label{sec:prelude}
 
-\todoi{Show how we support some prelude stuff. Of course we skip all
-  the type class stuff}
+Apart from mapping the Haskell syntax to Gallina syntax, we also want
+to have some support for the Haskell Prelude. We do this by writing
+our own Coq Prelude which implements definitions from the Haskell
+Prelude as defined in the Haskell Report.
 
-\todoi{We also skip the obviously non-terminating stuff like iterate
-  and such.}
+Apart from implementing the functions, which sometimes just means
+picking a definition from the Coq standard library and filling in the
+correct parameters, we also specify how these definitions should be
+extracted.
 
-\todoi{We have to write our own B-C definitions of partial functions
-  like head and tail, but during extraction they get mapped to the
-  Prelude functions |head| and |tail|.}
+Since we do not support all of Haskell 98, we also cannot support all
+of the Haskell 98 Prelude. For example, we skipped all the definitions
+that need type classes such as the numeric operations.
+
+More interesting cases are functions that have inexhaustive pattern
+matches, e.g. |head| and |tail|. For these functions we have used the
+Bove-Capretta method to define them. When calling these functions in
+the Gallina code, we need to provide the extra proofs as arguments to
+the calls. During extraction, these extra arguments get erased.
+
+So far we have only considered the list functions on finite lists;
+e.g. sometimes we want to perform a |take| on an infinite list, which
+with the current approach is not possible. We also do not support
+functions such as |iterate| and |repeat|, that always produce infinite
+lists. We can implement similar functions, but they would then work on
+streams instead of lists.
+
+The function |until| is not supported as it is obviously not
+structurally recursive, since it the termination behaviour of this
+function depends non-trivially on the given input. So it is better for
+the user to provide special purpose functions that are less general
+instead.
 
 \section{Related work}
 \label{sec:relatedwork}
