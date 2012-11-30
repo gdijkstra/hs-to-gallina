@@ -8,14 +8,8 @@ Extract Inductive unit => "()" [ "()" ].
 
 Definition id {a : Set} : a -> a := fun x => x.
 Definition const {a b : Set} : a -> b -> a := fun x _ => x.
-Definition _compose {a b c : Set} (g : b -> c) (f : a -> b) : a -> c :=
-  fun x => g (f x).
-(* TODO: add infix operator for compose *)
 Definition flip {a b c : Set} (f : a -> b -> c) : b -> a -> c :=
   fun x y => f y x.
-Definition _apply {a b : Set} (f : a -> b) (x : a) : b :=
-  f x.
-(* TODO: add infix operator for apply *)
 
 (* Booleans *)
 
@@ -46,13 +40,9 @@ Notation "[ x , .. , y ]" := (cons x .. (cons y nil) ..).
 
 Extract Inductive list => "List" [ "[]" "(:)" ].
 Extract Constant List "a" => "[a]".
-Extract Inlined Constant app => "(Prelude.++)".
 
 Definition filter := filter.
 Implicit Arguments app [A].
 Definition concat {A : Type} (l : list (list A)) := fold_right (app (A:=A)) nil l.
 Implicit Arguments filter [A].
 
-(* Tuples *)
-
-Extract Inductive prod => "(,)" [ "(,)" ].

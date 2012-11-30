@@ -3,6 +3,8 @@
 -- Left out:
 
 -- * Everything that has to do with classes.
+-- * Infix operators (.), (&&), (||), ($), (!!), (++)
+-- * Tuple: type and data constructors, (un)curry, span, break, zip, zip3, zipWith, zipWith3, unzip, unzip3
 -- * seq, ($!)
 -- * Char, String.
 -- * IO
@@ -17,13 +19,8 @@
 -- * Ordering data type.
 -- * error/undefined. We don't want this by definition of the problem we are trying to solve?
 -- * until
--- * head, tail, last, init, (!!): how to deal with partiality?
--- * (!!), take, drop, replicate, splitAt: how to deal with ints?
-
-infixr 9  .
-infixr 3  &&
-infixr 2  ||
-infixr 0  $
+-- * head, tail, last, init: how to deal with partiality?
+-- * take, drop, replicate, splitAt: how to deal with ints?
 
 id               :: a -> a
 id x             =  x
@@ -31,23 +28,11 @@ id x             =  x
 const            :: a -> b -> a
 const x _        =  x
 
-(.)              :: (b -> c) -> (a -> b) -> a -> c
-f . g            =  \ x -> f (g x)
-
 flip             :: (a -> b -> c) -> b -> a -> c
 flip f x y       =  f y x
 
-($) :: (a -> b) -> a -> b
-f $  x    =  f x
-
 data  Bool  =  False | True
 
-(&&), (||)       :: Bool -> Bool -> Bool
-True  && x       =  x
-False && _       =  False
-True  || _       =  True
-False || x       =  x
-                                        
 not              :: Bool -> Bool
 not True         =  False
 not False        =  True
@@ -71,39 +56,17 @@ data  Ordering  =  LT | EQ | GT
 
 data  [a]  =  [] | a : [a]
 
-data  (a,b)   =  (a,b)
-
-data  (a,b,c) =  (a,b,c)
-
-fst              :: (a,b) -> a
-fst (x,y)        =  x
-
-snd              :: (a,b) -> b
-snd (x,y)        =  y
-
-curry            :: ((a, b) -> c) -> a -> b -> c
-curry f x y      =  f (x, y)
-
-uncurry          :: (a -> b -> c) -> ((a, b) -> c)
-uncurry f p      =  f (fst p) (snd p)
-
 error            :: String -> a
 error            =  primError
 
 undefined        :: a
 undefined        =  error "Prelude.undefined"
 
-infixl 9  !!
-infixr 5  ++
 infix  4  `elem`, `notElem`
 
 map :: (a -> b) -> [a] -> [b]
 map f []     = []
 map f (x:xs) = f x : map f xs
-
-(++) :: [a] -> [a] -> [a]
-[]     ++ ys = ys
-(x:xs) ++ ys = x : (xs ++ ys)
 
 filter :: (a -> Bool) -> [a] -> [a]
 filter p []                 = []
@@ -141,12 +104,6 @@ null (_:_)       =  False
 length           :: [a] -> Int
 length []        =  0
 length (_:l)     =  1 + length l
-
-(!!)                :: [a] -> Int -> a
-xs     !! n | n < 0 =  error "Prelude.!!: negative index"
-[]     !! _         =  error "Prelude.!!: index too large"
-(x:_)  !! 0         =  x
-(_:xs) !! n         =  xs !! (n-1)
 
 foldl            :: (a -> b -> a) -> a -> [b] -> a
 foldl f z []     =  z
@@ -213,15 +170,6 @@ dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
             | otherwise =  xs
 
-span, break             :: (a -> Bool) -> [a] -> ([a],[a])
-span p []            = ([],[])
-span p xs@(x:xs') 
-            | p x       =  (x:ys,zs) 
-            | otherwise =  ([],xs)
-                           where (ys,zs) = span p xs'
-
-break p                 =  span (not . p)
-
 reverse          :: [a] -> [a]
 reverse          =  foldl (flip (:)) []
 
@@ -232,25 +180,3 @@ or               =  foldr (||) False
 any, all         :: (a -> Bool) -> [a] -> Bool
 any p            =  or . map p
 all p            =  and . map p
-
-zip              :: [a] -> [b] -> [(a,b)]
-zip              =  zipWith (,)
-
-zip3             :: [a] -> [b] -> [c] -> [(a,b,c)]
-zip3             =  zipWith3 (,,)
-
-zipWith          :: (a->b->c) -> [a]->[b]->[c]
-zipWith z (a:as) (b:bs)
-                 =  z a b : zipWith z as bs
-zipWith _ _ _    =  []
-
-zipWith3         :: (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith3 z (a:as) (b:bs) (c:cs)
-                 =  z a b c : zipWith3 z as bs cs
-zipWith3 _ _ _ _ =  []
-
-unzip            :: [(a,b)] -> ([a],[b])
-unzip            =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
-
-unzip3           :: [(a,b,c)] -> ([a],[b],[c])
-unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
