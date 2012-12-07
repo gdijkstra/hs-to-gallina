@@ -6,7 +6,7 @@ preview : report.pdf
 report.pdf : report.tex
 	pdflatex report.tex && pdflatex report.tex && pdflatex -synctex=1 report.tex
 
-report.tex : report.lhs
+report.tex : report.lhs report.fmt
 	lhs2TeX -o report.tex report.lhs
 
 clean :
