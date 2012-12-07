@@ -1,6 +1,6 @@
 \documentclass[a4paper,10pt]{article}
 
-%include polycode.fmt
+%include report.fmt
 
 \newcommand{\todoi}[1]{\todo[inline]{#1}}
 
@@ -269,8 +269,8 @@ $\Omega$: after a couple of reduction steps |loop| reduces to |loop|.
 
 Allowing negative data types in Coq means that we can construct terms
 that have no normal form. Constructions like the above can be used to
-define terms of type \verb+False+, which would make the whole system
-useless.
+define terms of the empty type \verb+False+, which would make the
+whole system useless.
 
 Our tool does not check for these kind of constraints on data types
 and defers the error messages to Coq.
@@ -413,62 +413,260 @@ variable.
 \section{General recursion and partiality}
 \label{sec:genrec}
 
-\todoi{Explain problem, explain array of solutions, explain why we
-  chose this solution specifically. (Extraction!)}
+Coq demands that all our definitions be terminating and total. This is
+enforced by checking whether the pattern matches are exhaustive. For
+recursive definitions we are restricted to structural recursion: there
+should be at least one argument that decreases structurally in every
+recursive call, i.e. we pattern match on this argument and call the
+function recursively on the constituents of that pattern.
+
+Haskell does not enforce these properties: definitions that violate
+either of these properties are commonplace. A typical example of a
+function that has non-exhaustive pattern matches is |head|. Of course,
+we can rewrite partial functions like these to total ones by using the
+|Maybe| data type, but there are cases in which we know that a
+particular call to |head| never fails and that the overhead of using
+|Maybe| is not worth it. We therefore need a way to translate
+functions like |head| in such a way that we can convince Coq that the
+call is safe and that the extracted code looks a lot like the original
+Haskell code.
+
+Consider the following Haskell definition\todo{Maybe make this into a
+  figure so we can refer to it later on?}:
+
+\begin{code}
+  quicksort           ::  [Nat] -> [Nat]
+  quicksort []        =  []
+  quicksort (x : xs)  =  append
+                         (quicksort (filter (gt x) xs))
+                         (quicksort (filter (le x) xs))
+\end{code}
+
+where |Nat| is the natural numbers, |append| is |(++)|, |gt| and |le|
+are the ``greater than'' and ``less than or equal'' relations on
+|Nat|, i.e. they are of type |Nat -> Nat -> Bool|. If we translate
+this directly to Gallina, we will run into the problem that Coq cannot
+discover a parameter that structurally decreases every recursive
+call. It cannot infer that |filter (gt x) xs| is indeed structurally
+smaller than |x : xs|.
+
+There are numerous ways of changing the definition in such a way that
+Coq does accept it. A popular method is to use well-founded recursion,
+for example using the Program tactic.\todo{Add citation} This method
+has the property that we do not need to change the type of our
+definition. We can also write our definitions in such a way, that the
+proofs of termination get erased during extraction. However, we did
+not choose well-founded recursion as it does not allow for definitions
+with non-exhaustive pattern matches or functions that only terminate
+for certain inputs.
+
+Another approach is to encapsulate the return value in a
+non-termination monad, such as Capretta's coinductive delay
+monad\todo{Add appropriate references}. These approaches need us to
+change the type of our original definition and the body of the
+definition needs to be rewritten in monadic style to reflect the
+change in return type. Changing the type of the definition also means
+that the extracted code will not be compatible anymore.\todo{Meh, what
+  does \emph{compatible} mean here? Types are different because the
+  types are different...} \todoi{Proving stuff using these monads
+  might be painful.}
+
+The method we chose is the Bove-Capretta
+method\cite{CambridgeJournals:318914}. Instead of having a general
+purpose accessability predicate as we have for well-founded recursion,
+we make an ad-hoc one for the definition we want to translate. The
+idea is that we can rewrite the function definition to take proofs of
+this ad-hoc predicate as an extra argument and that we now recurse
+structurally on these proofs. This means that we do have to change the
+type of our function, but this can be done in such a way that this
+gets erased again during extraction. Another big selling point of this
+translation is that it also allows for partial functions.
+
+All the good stuff does come with a price: every time we call a
+function (in our Coq script) translated with the Bove-Capretta method,
+we need to provide a proof of our ad-hoc accessability predicate. This
+technique does not magically prove termination for our programs, it
+just makes it possible to prove termination.
 
 \subsection{Bove-Capretta method}
 \label{sec:bcmethod}
 
-\todoi{explain method}
+Suppose that we have a Haskell function |f :: s0 -> hdots -> sn -> tau|
+defined by the following equations:
 
-\todoi{explain how nested recursion leads to induction-recursion and that
-we cannot easily do this in Coq, in general.}
+\begin{code}
+  f     p00    hdots     p0n =   e0
+  vdots        ddots             vdots
+  f     pm0    hdots     pmn =   em
+\end{code}
 
-\todoi{for sake of simplicity, we only consider apps and vars: no case
-  expressions and guards. These can be added.}
+We make a special purpose inductive data type (or predicate) that
+should have as inhabitants proofs that our function terminates for the
+given input. If we add this predicate as an argument to our function
+and pass the right values along recursively, we will see that we are
+recursing structurally on the proofs of our predicate, that
+essentially encode the call graph for the corresponding input.
 
-\subsection{Implementation}
-\label{sec:bcimpl}
+So suppose we have a Haskell function |f :: s0 -> hdots -> sn -> t|, the
+predicate would have type \verb+f_acc : s_0 -> ... -> s_n -> Prop+,
+i.e. it is indexed by the arguments of the function.
 
-\todoi{generate inductive data type}
+What does it mean for this function |f| to terminate? How can we
+express this as a proposition depending on our input |x0 ... xn|? We
+look at all the equations of our definition and can derive the
+constructors of our predicate as follows: |f| terminates for input
+|pi0 ... pin| (as terms instead of patterns) if it terminates for all
+the recursive calls to |f| in |ei|. The constructor for the $i$-th
+equation consists of a context induced by the patterns (i.e. all the
+pattern variables and their types) and a termination proof for every
+recursive call.
 
-\todoi{details on Prop versus Set wrt extraction.}
+\todoi{Note that we only support vars and apps. Support for case
+  statements and lambdas can be added, but things get a lot more
+  complicated without improving on the expressiveness of things.}
 
-\todoi{generate new function}
+\subsubsection{Generating the inductive data type}
+\label{sec:genpred}
 
-\todoi{Detail about contextual implicit arguments for functions that
-  have been generated by this method.}
+\todoi{Extract context, detail with type synonyms, only works with
+  data types defined in module itself and built-in types (currently
+  only lists)}
 
-\subsubsection{Inversion theorems}
-\label{sec:invthms}
+\todoi{Extract recursive calls, these need to be fully applied
+  (explain why)}
 
-\todoi{Since the predicate is of sort Prop, we cannot pattern match on
-  inhabitants of this predicate, since the type of the result of the
-  function we are transforming is of sort Type. We need inversions
-  theorems to get around this.}
+\todoi{Note how nested recursion fails: we depend on the function that
+  we are currently defining, mutual recursion between function and
+  data type definition, is called induction-recursion, not supported
+  by Coq, but supported by Agda.}
 
-\todoi{Details on the inversion proofs and why they should work.}
+\subsubsection{Generating the new function definition}
+\label{sec:genfun}
 
-\todoi{Note that ltac script would probably be better}
+\todoi{add argument to type: contextual implicit arguments are biting
+  us now: disable automatic implicit arguments when defining
+  functions. (The polymorphic stuff is explicit.}
 
-\subsubsection{Missing patterns}
-\label{sec:missingpats}
+\todoi{change body of function: dependent pattern matching, theorems
+  we need, prop vs set}
 
-\todoi{Details of missing pattern implementation.}
+\todoi{add right inv thms to right positions. Thms generation proofs
+  stuff warrants its own subsubsection later on.}
 
-\todoi{Details of implementation: what do we restrict ourselves to?
-  Type synonyms stuff again.}
+\todoi{missing patterns also need a case: we need to calculate
+  these. explain what kind of theorems we need here and how we can use
+  \verb+False_rec+. Refer to later subsubsections for calculation of
+  missing pats and generation of proofs.}
+
+\subsubsection{Calculating the missing patterns}
+\label{sec:genmispat}
+
+\todoi{explain the general idea, basically paraphrasing that one
+  StackOverflow post. Maybe should also cite Augustsson's paper.}
+
+\subsubsection{Inversion theorems and their proofs}
+\label{sec:genproof}
+
+\todoi{Explain the gist of it: for recursive calls: we need to select
+  the right field of the right constructor. Explain the tactics we use
+  for this. For the theorems for missing patterns: we need to prove
+  that if we have a proof of termination, then the input cannot match
+  with the given pattern. This can then just be done by a simple
+  proof.}
 
 \subsubsection{Examples}
-\label{sec:bcexamples}
+\label{sec:genexamples}
 
-\todoi{Show examples.}
+Consider the |quicksort| example given above. We can tell the
+HsToGallina tool to translate that definition using the following pragma:
 
-\todoi{Refine tactic example for how to use stuff. (Find a nice
-  example that I encountered in verification challenge?)}
+\begin{code}
+{-"\text{\{-\# OPTIONS\_Hs2Gallina bc: quicksort \#-\}}"-}
+\end{code}
 
-\todoi{We can automatically generate these refine tactic things, but
-  it does not work nicely with mutually recursive things.}
+The tool will then generate the following (we renamed \verb+quicksort+
+to \verb+qs+ to make it all fit on paper and left out the proofs of
+the inversion theorems):
+
+\begin{verbatim}
+...
+
+Inductive qs_acc : List Nat -> Prop :=
+  | qs_acc_0 : qs_acc nil
+  | qs_acc_1 : forall (x : Nat) (xs : List Nat) , 
+                        qs_acc (filter (gt x) xs) -> 
+                        qs_acc (filter (le x) xs) -> 
+                        qs_acc (cons x xs).
+
+Theorem qs_acc_inv_1_0 : forall (x0 : List Nat) (x : Nat) (xs : List Nat),
+  qs_acc x0 -> (x0 = cons x xs) -> qs_acc (filter (gt x) xs).
+...
+Defined.
+
+Theorem qs_acc_inv_1_1 : forall (x0 : List Nat) (x : Nat) (xs : List Nat),
+  qs_acc x0 -> (x0 = cons x xs) -> qs_acc (filter (le x) xs).
+...
+Defined.
+
+...
+
+Fixpoint qs (x0 : List Nat) (x1 : qs_acc x0) : List Nat :=
+  match x0 as _y0 return (x0 = _y0) -> List Nat with
+    | nil => fun _h0 => 
+               nil
+    | cons x xs => fun _h0 => 
+               append (qs (filter (gt x) xs) (qs_acc_inv_1_0 x1 _h0)) 
+                      (qs (filter (le x) xs) (qs_acc_inv_1_1 x1 _h0))
+           end (refl_equal x0).
+
+...
+\end{verbatim}
+
+The definition of |head| as outputted by our tool:
+
+\begin{verbatim}
+Inductive head_acc ( a : Set ) : List a -> Prop :=
+  | head_acc_0 : forall (x : a) (_xs : List a), head_acc (cons x _xs).
+
+Theorem head_acc_non_0 : forall (a : Set) (x0 : List a),
+  head_acc x0 -> (x0 = nil) -> Logic.False.
+...
+Defined.
+
+Definition head { a : Set } (x0 : List a) (x1 : head_acc x0) : a :=
+  match x0 as _y0 return (x0 = _y0) -> a with
+    | cons x _xs => fun _h0 => x
+    | nil => fun _h0 => False_rec a (head_acc_non_0 x1 _h0)
+  end (refl_equal x0).
+\end{verbatim}
+
+The definition itself is not too exciting, but when we want to use
+this function on some input \verb+e : List a+, we still have to give a
+proof \verb+p : head_acc e+. The \verb+refine+ tactic is particularly
+useful here. Consider for example the function |headReverse x xs =
+head (reverse (x : xs))|: we know that |reverse| preserves the length
+of a list, so the pattern match in |head| will not fail. The Coq
+translation of this would become:
+
+\begin{verbatim}
+Definition headReverse {a : Set} (x: a) (xs : List a) : a.
+refine (head (reverse (x :: xs)) _).
+...
+Defined.
+\end{verbatim}
+
+We have left out the proof as it is rather involved: we have to proof
+that we can construct a \verb+h+ and \verb+t+ such that
+\verb+reverse (x :: xs) = h :: t+, for any \verb+x+ and \verb+xs+.
+
+The extracted Haskell code of this fragment has non of the proofs and
+looks almost the same as our original code:
+
+\begin{code}
+headReverse :: a1 -> (List a1) -> a1
+headReverse x xs =
+  head (rev ((:) x xs))
+\end{code}
 
 \section{Coinduction}
 \label{sec:coind}
@@ -589,5 +787,9 @@ instead.
 
 \todoi{We still need the QuickCheck tests to see if the extracted code
   makes sense, i.e. nothing has been proved about that.}
+
+
+\bibliographystyle{plain}
+\bibliography{report}
 
 \end{document}
