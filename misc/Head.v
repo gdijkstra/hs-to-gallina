@@ -61,7 +61,7 @@ induction xs as [|h t IHt].
 (* xs = h :: t *) assert (exists h' : a, exists t' : list a, rev (x :: h :: t) = h' :: t').
 apply reverseHeadExists. simpl. omega. inversion H as [h' H']. inversion H' as [t' H''].
 rewrite -> H''. constructor.
-Qed.
+Defined.
 
 End Head.
 
