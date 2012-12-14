@@ -452,7 +452,12 @@ hasNonRenaming (Subst _ _ (GallinaPVarAnn _ _)) = Nothing
 hasNonRenaming (Subst s t _                   ) = Just (s, t)
 hasNonRenaming (Compose l r                   ) = hasNonRenaming l
                                                   `mplus` hasNonRenaming r
-
+-- | Missing pattern algorithm. Gets a list of (refined) multipatterns
+-- with substitutions such that if that substitution is applied to the
+-- given ideal multipattern, it is equal to the corresponding
+-- (refined) multipattern. (This is what @invariantHolds@ checks.)
+-- @State@ monad is used for the generation of fresh pattern
+-- variables.
 algorithm :: TypeConstructors -> Specifications -> [(MultiPattern, MultiPatSubst)] -> MultiPattern -> State Int [MultiPattern]
 algorithm _      _     []            idealMultiPat = return [idealMultiPat]
 algorithm tycons specs a@((_, s1):_) idealMultiPat = if not (invariantHolds a idealMultiPat) then error "oei!" else
@@ -467,6 +472,8 @@ algorithm tycons specs a@((_, s1):_) idealMultiPat = if not (invariantHolds a id
 refineMultiPatSubs :: MultiPattern -> [(MultiPattern, MultiPatSubst)] -> [(MultiPattern, MultiPatSubst)]
 refineMultiPatSubs q = mapMaybe (\(multipat, _) -> fmap (\s -> (multipat, s)) $ unifyMultiPats q multipat)
 
+-- | Apply the substitution to the ideal multipattern and see whether
+-- it is equal to the multipattern corresponding to the substitution.
 invariantHolds :: [(MultiPattern, MultiPatSubst)] -> MultiPattern -> Bool
 invariantHolds multiPatsSubs idealMultiPat = all (\(a,b) -> a == b)
                                              . map (\(a,s) -> (a, applyMultiPatSubst s idealMultiPat))
