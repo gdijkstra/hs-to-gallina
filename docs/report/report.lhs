@@ -10,6 +10,7 @@
 \usepackage{cite}
 \usepackage{todonotes}
 \usepackage{tgpagella}
+\usepackage[numbers]{natbib}
 
 \title{Experimentation project report: \\
 Translating Haskell programs to Coq programs}
@@ -56,8 +57,6 @@ program, we need do this in such a way that the extracted Haskell code
 still has the same interface (i.e. the types of the definitions are
 the same) so we can plug the verified module back into the rest of our
 Haskell code base.
-
-% TODO: Transition to this here below?
 
 The goal of this experimentation project is to find answers to the
 following questions:
@@ -431,8 +430,7 @@ functions like |head| in such a way that we can convince Coq that the
 call is safe and that the extracted code looks a lot like the original
 Haskell code.
 
-Consider the following Haskell definition\todo{Maybe make this into a
-  figure so we can refer to it later on?}:
+Consider the following Haskell definition:
 
 \begin{code}
   quicksort           ::  [Nat] -> [Nat]
@@ -452,8 +450,8 @@ smaller than |x : xs|.
 
 There are numerous ways of changing the definition in such a way that
 Coq does accept it. A popular method is to use well-founded recursion,
-for example using the Program tactic.\todo{Add citation} This method
-has the property that we do not need to change the type of our
+for example using the Program tactic (\citet{programtactic}). This
+method has the property that we do not need to change the type of our
 definition. We can also write our definitions in such a way, that the
 proofs of termination get erased during extraction. However, we did
 not choose well-founded recursion as it does not allow for definitions
@@ -462,17 +460,14 @@ for certain inputs.
 
 Another approach is to encapsulate the return value in a
 non-termination monad, such as Capretta's coinductive delay
-monad\todo{Add appropriate references}. These approaches need us to
+monad (\citet{prophecy}). These approaches need us to
 change the type of our original definition and the body of the
 definition needs to be rewritten in monadic style to reflect the
 change in return type. Changing the type of the definition also means
-that the extracted code will not be compatible anymore.\todo{Meh, what
-  does \emph{compatible} mean here? Types are different because the
-  types are different...} \todoi{Proving stuff using these monads
-  might be painful.}
+that the extracted code will not be compatible anymore.
 
 The method we chose is the Bove-Capretta
-method\cite{CambridgeJournals:318914}. Instead of having a general
+method (\citet{bcmethodart}). Instead of having a general
 purpose accessability predicate as we have for well-founded recursion,
 we make an ad-hoc one for the definition we want to translate. The
 idea is that we can rewrite the function definition to take proofs of
@@ -505,11 +500,7 @@ should have as inhabitants proofs that our function terminates for the
 given input. If we add this predicate as an argument to our function
 and pass the right values along recursively, we will see that we are
 recursing structurally on the proofs of our predicate, that
-essentially encode the call graph for the corresponding input.
-
-So suppose we have a Haskell function |f :: s0 -> hdots -> sn -> t|, the
-predicate would have type \verb+f_acc : s_0 -> ... -> s_n -> Prop+,
-i.e. it is indexed by the arguments of the function.
+essentially encode the call graphs for the corresponding input.
 
 What does it mean for this function |f| to terminate? How can we
 express this as a proposition depending on our input |x0 ... xn|? We
@@ -521,58 +512,171 @@ equation consists of a context induced by the patterns (i.e. all the
 pattern variables and their types) and a termination proof for every
 recursive call.
 
-\todoi{Note that we only support vars and apps. Support for case
-  statements and lambdas can be added, but things get a lot more
-  complicated without improving on the expressiveness of things.}
+Currently we support a very small fragment of Haskell for the
+right-hand sides of the equations of the function definition: only
+variables and applications are allowed. Support for guards and case
+statements can be added, but since this increases the complexity of
+our tool without really improving on the expressiveness of the
+language fragment we allow.
 
 \subsubsection{Generating the inductive data type}
 \label{sec:genpred}
 
-\todoi{Extract context, detail with type synonyms, only works with
-  data types defined in module itself and built-in types (currently
-  only lists)}
+Given a Haskell function |f :: s0 -> hdots -> sn -> tau|, we need to
+generate a predicate \verb+f_acc+ parametrised by (the translations
+of) the free type variables of |s0|, |hdots|, |sn| and indexed by
+|s0|, |hdots|, |sn|. The parameters and indices we can get directly
+from the type of the function.
 
-\todoi{Extract recursive calls, these need to be fully applied
-  (explain why)}
+In order to generate the constructor corresponding to the $i$-th
+constructor, we need to extract the context induced by the left-hand
+side (the patterns) and every recursive call occurring in the
+right-hand side. The context consists of all the variables that can be
+found in the patterns of the equation along with their types. This is
+done by annotating all the variables occurring the patterns. To be
+able to do this, the \emph{specification} of every constructor used in
+the patterns must be known, i.e. the types of all its arguments. Once
+we have annotated the variables, we can collect them along with their
+types. Note that only the specifications of the data constructors
+defined in the module that is currently being translated are
+available, and the specifications of the list constructors.
 
-\todoi{Note how nested recursion fails: we depend on the function that
-  we are currently defining, mutual recursion between function and
-  data type definition, is called induction-recursion, not supported
-  by Coq, but supported by Agda.}
+After we have extracted the context for the constructor for the $i$-th
+equation, we need to find all the recursive calls in the right-hand
+side |ei|. Every (fully-applied) recursive call |f a0 hdots an|
+translates to a field \verb+f_acc a_0 ... a_n+ of the constructor we
+are generating, where every \verb+a_i+ is the translation of
+|ai|. Note that we run into problems in the case of nested recursion,
+i.e. when some |ai| again contains a call to |f|. This means that we
+have to refer to the function \verb+f+ in our definition of the
+predicate \verb+f_acc+, which in turn is used to define \verb+f+. To
+be able to write such definitions that have a mutual dependency
+between data types and functions, we need the so-called
+induction-recursion scheme \citet{inductionrecursion}.
 
 \subsubsection{Generating the new function definition}
 \label{sec:genfun}
 
-\todoi{add argument to type: contextual implicit arguments are biting
-  us now: disable automatic implicit arguments when defining
-  functions. (The polymorphic stuff is explicit.}
+The Bove-Capretta translation of our Haskell function |f :: s0 ->
+hdots -> sn -> tau| takes a proof of the accessability predicate
+\verb+f_acc+ as an extra argument. The type of the Coq definition
+\verb+f+ becomes
+\verb=forall (x0 : s_0) ... (xn : s_n) (xn+1 : f_acc x0 ... xn) :
+t=. One caveat of this new dependent type is that since we have
+enabled the contextual implicit parameters option, Coq will make the
+\verb+s_0+, |hdots|, \verb+s_n+ implicit arguments since they can be
+inferred from the proof of \verb+f_acc x0 ... xn+. For this reason we
+disable this particular option for function definitions.
 
-\todoi{change body of function: dependent pattern matching, theorems
-  we need, prop vs set}
+Now that we have adapted the type of our function, we need its body to
+reflect these changes. One way of doing this is to pattern match only
+on the \verb+f_acc x0 ... xn+ value. This then introduces the same
+context as we would get from the original pattern matches and gives us
+the appropriate arguments for the recursive calls. It is easy to see
+that directly pattern matching on the proofs of the predicate gives us
+a structurally recursive definition. However, since
+\verb+f_acc x0 ... xn+ is of sort \verb+Prop+, we cannot do
+this. Instead of pattern matching directly on the proofs, we generate
+(and proof) theorems that essentially do this for us, which is the
+subject of section~\ref{sec:genproof}. Using these theorems, we can
+just pattern match on our original input and call the appropriate
+generated theorems for the recursive calls.
 
-\todoi{add right inv thms to right positions. Thms generation proofs
-  stuff warrants its own subsubsection later on.}
-
-\todoi{missing patterns also need a case: we need to calculate
-  these. explain what kind of theorems we need here and how we can use
-  \verb+False_rec+. Refer to later subsubsections for calculation of
-  missing pats and generation of proofs.}
+If the pattern matches of our original function definition were not
+exhaustive, we still need to add the missing patterns. We can prove
+that these missing patterns never occur, given a proof of
+\verb+f_acc x0 ... xn+. Given such an impossibility proof, we can use
+\verb+False_rec+ to write a term of the correct type for the
+right-hand side of the match.
 
 \subsubsection{Calculating the missing patterns}
 \label{sec:genmispat}
 
-\todoi{explain the general idea, basically paraphrasing that one
-  StackOverflow post. Maybe should also cite Augustsson's paper.}
+In order to make the pattern matches of the given function definition
+exhaustive, we need to calculate the missing patterns. The algorithm
+we implemented is part of an algorithm for compiling pattern matching
+paper\citet{patternmatching}. Note that throughout the presentation
+below, we assume that all patterns are well-typed \emph{linear}: every
+pattern variable occurs only once. Being valid Haskell code implies
+that the patterns satisfy these conditions, hence we do not check for
+this ourselves.
+
+The problem we want to solve is: given the set of original patterns
+|{mp0, hdots, mpn}|, we want to determine whether this set covers all
+possible input values, and if this is not the case: find the patterns
+we need to add to this set such that it does become a covering set.
+
+The main idea of the algorithm is that we want to check whether a set
+of \emph{actual patterns} cover the given current \emph{ideal
+  pattern}. This is done by repeatedly splitting the ideal pattern on
+the most general pattern and recursively invoking the algorithm on
+these new ideal patterns with the appropriate new actual patterns. The
+invariant that we have to main is that every actual pattern |mpi| can
+be unified with the ideal pattern |mq|.
+
+We start of by calculating the initial ideal pattern, i.e. the pattern
+that covers all given patterns. For the initial ideal pattern we chose
+|mq| to be |q0 hdots qn| where every |qi| is a pattern variable of
+type |si|. The fact that |mq| covers |{mp0, hdots, mpn}| is
+established by substitutions\footnote{The slight abuse of notation is
+  justified by the fact that |mq| consists solely of pattern
+  variables.} |ssi = mq /-> mpi|.
+
+The first substitution |ss0| is inspected to see whether it is a
+injective renaming of pattern variables.\footnote{In our
+  implementation we do not actually check whether the renaming is
+  injective, since this is implied by the linearity of the patterns
+  and the way we generate our substitutions.} If this is the case,
+then the ideal pattern |mq| is $\alpha$-equivalent to the actual
+pattern |mp0|. If it happens that the current set of actual patterns
+has size $>1$, then we have overlapping patterns, which is also
+something we do not allow.
+
+If the substitution |ss0| does not simply rename variables, there is a
+pattern variable |v| in the ideal pattern |mq|. The ideal pattern gets
+split into several new patterns by mapping |v| to all the possible
+constructor patterns. The algorithm is then recursively invoked on
+these ideal patterns with the refined actual patterns, i.e. the
+current actual patterns that can be unified with the new ideal
+pattern, in order to maintain the invariant. The results of these
+invocations are then concatenated and returned.
+
+Since we need to know the types of every pattern variable, we need to
+again work with annotated patterns. Apart from that, we also need to
+know into which constructor patterns a pattern variable can be split,
+given its type. For this we need a mapping from type constructors to
+their data constructors. These are looked up using the name of the
+type constructor, currently disregarding type synonyms, so even though
+type synonyms are syntactically supported, they will result in errors
+when we try to apply the Bove-Capretta method to functions that make
+use of type synonyms in their type signatures. A solution would be to
+also keep track of the type synonyms and performing the right
+substitutions on the types when needed.
 
 \subsubsection{Inversion theorems and their proofs}
 \label{sec:genproof}
 
-\todoi{Explain the gist of it: for recursive calls: we need to select
-  the right field of the right constructor. Explain the tactics we use
-  for this. For the theorems for missing patterns: we need to prove
-  that if we have a proof of termination, then the input cannot match
-  with the given pattern. This can then just be done by a simple
-  proof.}
+As mentioned in section~\ref{sec:genfun} we cannot pattern match on
+proofs of the accessability predicate to access the constituents we
+need to do the recursive calls. Instead, we generate inversion
+theorems that give us the appropriate values: the theorems select the
+field corresponding to the recursive call of the constructor
+corresponding to the current match. Apart from the theorem, a proof is
+also generated.
+
+For the missing patterns we also need theorems telling us that these
+can never occur when we have a proof of our accessability
+predicate. For a missing pattern |p0 hdots pn| of our function |f : s0
+-> ... -> sn -> tau|, we need to generate a theorem of the form:
+
+\begin{verbatim}
+forall ctx (x0 : s_0) ... (xn : s_n), 
+  f_acc x0 .. xn  -> (x0 = p0) -> ... -> (xn = pn) -> Logic.False.
+\end{verbatim}
+
+where \verb+ctx+ is the context induced by the pattern |p0 hdots
+pn|. Proofs of these theorems are also automatically generated by the
+tool.
 
 \subsubsection{Examples}
 \label{sec:genexamples}
@@ -585,8 +689,9 @@ HsToGallina tool to translate that definition using the following pragma:
 \end{code}
 
 The tool will then generate the following (we renamed \verb+quicksort+
-to \verb+qs+ to make it all fit on paper and left out the proofs of
-the inversion theorems):
+to \verb+qs+ to make it all fit on paper and have left out the proofs
+of the inversion theorems as they are rather long not very
+interesting):
 
 \begin{verbatim}
 ...
@@ -622,7 +727,14 @@ Fixpoint qs (x0 : List Nat) (x1 : qs_acc x0) : List Nat :=
 ...
 \end{verbatim}
 
-The definition of |head| as outputted by our tool:
+As we can see above, there are no missing patterns hence no theorems
+to handle these. There are two recursive calls with two corresponding
+inversion theorems. The function definition still has the same shape
+as before the translation, except for the extra arguments being passed
+around and some dependent pattern matching to make everything work.
+
+As an example of a definition with non-exhaustive patterns, the
+translation of |head| as outputted by our tool:
 
 \begin{verbatim}
 Inductive head_acc ( a : Set ) : List a -> Prop :=
@@ -639,6 +751,9 @@ Definition head { a : Set } (x0 : List a) (x1 : head_acc x0) : a :=
     | nil => fun _h0 => False_rec a (head_acc_non_0 x1 _h0)
   end (refl_equal x0).
 \end{verbatim}
+
+There are no recursive calls, hence no inversion theorems, and one
+theorem proving that we cannot have |nil| as input.
 
 The definition itself is not too exciting, but when we want to use
 this function on some input \verb+e : List a+, we still have to give a
@@ -657,15 +772,17 @@ Defined.
 
 We have left out the proof as it is rather involved: we have to proof
 that we can construct a \verb+h+ and \verb+t+ such that
-\verb+reverse (x :: xs) = h :: t+, for any \verb+x+ and \verb+xs+.
+\verb+reverse (x :: xs) = h :: t+, for any \verb+x+ and \verb+xs+. If
+we have such a \verb+h+ and \verb+t+ we can construct the required
+\verb+head_acc (reverse (x :: xs)+.
 
-The extracted Haskell code of this fragment has non of the proofs and
+The extracted Haskell code of this fragment has none of the proofs and
 looks almost the same as our original code:
 
 \begin{code}
 headReverse :: a1 -> (List a1) -> a1
 headReverse x xs =
-  head (rev ((:) x xs))
+  head (reverse ((:) x xs))
 \end{code}
 
 \section{Coinduction}
@@ -769,27 +886,76 @@ instead.
 \section{Related work}
 \label{sec:relatedwork}
 
-\todoi{Verifying Haskell in CTT paper}
+\citet{verifhaskart} have implemented a translation from Haskell to
+Agda via (a subset of) the GHC-Core intermediate language. The main
+advantage of this approach that things like type inference and
+ordering of definitions have already been done. Supporting type
+classes is also very straightforward as it gets desugared to explicit
+dictionary passing. 
 
-% Function interface and related articles?
+The downside of translating to GHC-Core is that it will not look like
+the original Haskell code at all, because of things like inlining.
+
+Translate to GHC-Core, just like \citet{verifhaskart} did, but instead
+of using monads to deal with partiality, use Bove-Capretta
+method. However, since translating to core gives us deeply nested
+stuff, it might be hard to relate things back to the original
+definition. Also, inlining and everything. Might be possible to use
+predicate from original definition on core definition and transform
+core. However, this might be very difficult and optimisiations might
+screw up everything. Then we'd get a lot of features for free, such as
+type classes up to a certain extent. But not GADTs since we do not
+have coercions.
 
 \section{Future work}
 \label{sec:futurework}
 
-\todoi{Modules, better syntax support, refine tactic support, type
-  synonyms, type classes, GADTs, better integration with GHC for
-  finding imports and dependencies and et cetera.}
+We currently assume that every top-level definitions has an explicit
+type signature. Ideally, we would want to infer this kind of
+information, but we do not want to go through the trouble of doing the
+type inference ourselves. One way to solve this is to make use of the
+GHC API. Apart from type inference, it also provides us with kind
+inference that we need for dealing with parametric polymorphism.
+
+If we want to support modules, the GHC API can be very helpful here as
+well to provide us with the necessary information, such as the type
+signatures of the definitions we want to import. Using these type
+signatures, we can make axioms in Coq postulating that we have
+definitions of that type.
+
+Right now, our tool produces invalid Coq code whenever we call a
+function that has been defined using the Bove-Capretta method, as it
+now expects an extra argument (the proof of the accessability
+predicate). It would be nice if our tool would generate these holes
+automatically and would generate some script that makes use of the
+\verb+refine+ tactic, so that the user can easily see where it has to
+fill in the proofs. The problem is, however, that the \verb+refine+
+tactic does not play nice with mutually recursive definitions: we
+cannot just wrap the whole definition in a \verb+refine+ tactic
+command. Solving this would be nice.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-\todoi{We can automate a large portion of the translation process.}
+We have seen that it is possible to automatically translate a sizable
+subset of Haskell 98 to a Coq script. This can also be done in such a
+way that if we extract the Coq script back to Haskell code, we will
+get a module that is compatible with the original: the definitions in
+the extracted module have the same types as the corresponding original
+definitions. 
 
-\todoi{We still need the QuickCheck tests to see if the extracted code
-  makes sense, i.e. nothing has been proved about that.}
+It is also possible to translate partial Haskell definitions in such a
+way that we can reason about them in Coq in a natural way, without
+losing the property that the extracted definition has the same type as
+the original Haskell definition. It is also possible to automate the
+menial parts of proving that definitions terminate, such as generating
+accessability predicates.
 
+The result may still need some post-processing in some cases, but it
+is viable that that can be automated. Currently we do not support all
+of Haskell 98, but is viable to extend this tool to support all of it.
 
-\bibliographystyle{plain}
+\bibliographystyle{plainnat}
 \bibliography{report}
 
 \end{document}
