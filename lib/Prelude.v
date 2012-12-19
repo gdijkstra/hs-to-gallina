@@ -11,6 +11,10 @@ Definition const {a b : Set} : a -> b -> a := fun x _ => x.
 Definition flip {a b c : Set} (f : a -> b -> c) : b -> a -> c :=
   fun x y => f y x.
 
+Extract Inlined Constant id => "Prelude.id".
+Extract Inlined Constant const => "Prelude.const".
+Extract Inlined Constant flip => "Prelude.flip".
+
 (* Booleans *)
 
 Require Import Bool.
@@ -27,6 +31,27 @@ Extract Inlined Constant Bool => "Prelude.Bool".
 Extract Inlined Constant False => "Prelude.False".
 Extract Inlined Constant True => "Prelude.True".
 Extract Inductive bool => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
+Extract Inlined Constant not => "Prelude.not".
+Extract Inlined Constant otherwise => "otherwise".
+
+(* Maybe *)
+
+Definition Maybe (a : Set) := option a.
+Definition Just := Some.
+Implicit Arguments None [].
+Definition Nothing := None.
+
+Definition maybe {a b : Set} (n : b) (f : a -> b) (m : Maybe a) : b :=
+  match m with
+    | Just x => f x
+    | Nothing => n
+  end.
+
+
+Extract Constant Maybe "a" => "Prelude.Maybe a".
+Extract Inlined Constant Just => "Prelude.Just".
+Extract Inlined Constant Nothing => "Prelude.Nothing".
+Extract Inlined Constant maybe => "Prelude.maybe".
 
 (* Lists *)
 
