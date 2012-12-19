@@ -2,11 +2,11 @@
 -- convert it to Coq code.
 module Main where
 
-import           AG
-import           BoveCapretta
+import           AG                     (Result, resVernacular, convertToGallina)
+import           BoveCapretta           (applyBoveCapretta)
+import           Coinduction            (makeCoinductive)
 import           Data.Foldable          (forM_)
 import           Data.Maybe             (fromJust, fromMaybe, isNothing)
-import qualified Data.Set               as S
 import           Gallina.PrettyPrinting
 import           Gallina.Syntax
 import           Language.Haskell.Exts
@@ -68,49 +68,14 @@ addCoqOutput args = args { optCoqOutput = return . fromMaybe (replaceExtension i
 parseArgs :: [String] -> Either String Args
 parseArgs argv = fmap addCoqOutput $
    case getOpt Permute options argv of
-      (o, _, []  ) -> let res = foldl (flip id) defaultArgs o
-                    in if (isNothing . optInput $ res) && (not . optShowVersion $ res)
-                       then Left $ usage ["Error: HsToGallina requires -f FILE\n"]
-                       else Right res
+      (o, _, []  ) -> checkResults $ foldl (flip id) defaultArgs o
       (_, _, errs) -> Left $ usage errs
   where
     usage errs = concat errs ++ usageInfo header options
     header = "Usage: HsToGallina -f FILE [OPTION...]"
-
--- | Change the fixpoints to cofixpoints for the definitions as
--- specified by the pragmas. Note that we will only change the
--- definitions if all definitions of a mutually recursive group should
--- be read coinductively. We will raise an error otherwise.
-makeCoinductive :: Result -> Result
-makeCoinductive r = r { resVernacular = v { documentCommands = newDefinitions } }
-  where
-    v = resVernacular r
-    coDefs = coDefinitions r
-    oldDefs = documentCommands v
-    fixName (Left b) = funName b
-    fixName (Right b) = patName b
-    newDefinitions = map adaptDefinition oldDefs
-    adaptDefinition (GallinaInductive is _) = case allOrNothing (flip S.member coDefs) . map inductiveName $ is of
-      Just b -> GallinaInductive is b
-      Nothing -> error "makeCoinductive: error."
-    adaptDefinition (GallinaFixpoint is _) = case allOrNothing (flip S.member coDefs) . map fixName $ is of
-      Just b -> GallinaFixpoint is b
-      Nothing -> error "makeCoinductive: error."
-    adaptDefinition d = d
-
--- | Check whether the predicate holds for all elements of the list,
--- or doesn't hold for all the elements of the list. If there's an odd
--- one out, we will return @Nothing@. Otherwise, we will return @Just
--- b@, where @b@ indicates whether the predicate holds for every
--- element of the list. An empty list will yield @Just True@ as a
--- result.
-allOrNothing :: (a -> Bool) -> [a] -> Maybe Bool
-allOrNothing _ [] = Just True
-allOrNothing p xs = foldr1 iff . map (Just . p) $ xs
-  where
-    iff (Just True) (Just True) = Just True
-    iff (Just False) (Just False) = Just False
-    iff _ _ = Nothing
+    checkResults res | (isNothing . optInput $ res) && (not . optShowVersion $ res) = Left $ usage ["Error: HsToGallina requires -f FILE\n"]
+                     | optShowVersion res = Left "HsToGallina, version 0.0.1"
+                     | otherwise = Right res
 
 -- | Add the appropriate implicit arguments commands before and after
 -- theorem definitions and data type definitions.
