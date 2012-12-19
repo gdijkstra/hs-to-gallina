@@ -60,6 +60,8 @@ this in such a way that the extracted Haskell code has the same
 interface (i.e.\ the types of the definitions are the same) so we can
 plug the verified module back into the rest of our Haskell code base.
 
+\newpage
+
 The goal of this experimentation project is to find answers to the
 following questions:
 
@@ -229,6 +231,8 @@ in types and vice versa. Our tool does not check whether there is such
 an overlap and assumes the names of data constructors and those of
 type constructors are distinct.
 
+\newpage
+
 Type synonyms can also be translated easily:
 
 \begin{code}
@@ -286,6 +290,8 @@ which would make the system inconsistent.
 
 Our tool does not check for these kind of constraints on data types
 and defers the error messages about this to Coq.
+
+\newpage
 
 \section{Parametric polymorphism and implicit parameters}
 \label{sec:parampoly}
@@ -766,6 +772,8 @@ to handle these. There are two recursive calls with two corresponding
 inversion theorems. The function definition still has the same shape
 as before the translation, except for the extra arguments being passed
 around and some dependent pattern matching to make everything work.
+
+\newpage
 
 As an example of a definition with non-exhaustive patterns, the
 translation of |head| as outputted by our tool:
