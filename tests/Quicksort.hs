@@ -1,4 +1,4 @@
-{-# OPTIONS_Hs2Gallina bc: quicksort #-}
+{-# OPTIONS_HsToGallina bc: quicksort #-}
 module Quicksort where
 
 data Nat = Zero | Succ Nat

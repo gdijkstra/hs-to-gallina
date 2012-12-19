@@ -725,7 +725,7 @@ HsToGallina tool to apply the Bove-Capretta translation to that
 definition using the following pragma:
 
 \begin{code}
-{-"\text{\{-\# OPTIONS\_Hs2Gallina bc: quicksort \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_HsToGallina bc: quicksort \#-\}}"-}
 \end{code}
 
 The tool will then generate the following (we renamed \verb+quicksort+
@@ -840,8 +840,8 @@ define an infinite stream of zeroes, we can write something as
 follows:
 
 \begin{code}
-{-"\text{\{-\# OPTIONS\_Hs2Gallina codata: Stream \#-\}}"-}
-{-"\text{\{-\# OPTIONS\_Hs2Gallina cofix: zeroes  \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_HsToGallina codata: Stream \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_HsToGallina cofix: zeroes  \#-\}}"-}
 
 ...
 

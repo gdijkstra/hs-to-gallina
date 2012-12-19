@@ -1,4 +1,4 @@
-{-# OPTIONS_Hs2Gallina co: Stream zeroes #-}
+{-# OPTIONS_HsToGallina co: Stream zeroes #-}
 
 module Coinduction where
 

@@ -9,7 +9,6 @@ import qualified Data.Map            as M
 import           Data.Maybe          (fromJust, fromMaybe, mapMaybe)
 import           Data.Set            (Set)
 import qualified Data.Set            as S
-import           Debug.Trace         (trace)
 import           Gallina.Syntax
 
 -- | Specification of a data constructor/function: the types of its
@@ -545,7 +544,7 @@ manipulateTerm arity m recFunName term = let (t',_,_) = count' 0 term True
       where
         (l', n' ,b) = count' n l False
         (r', n'',_) = count' n' r True
-    count' n t b = trace "manipulateTerm: cannot manipulate terms that contain something other than applications, variables or lists." $ (t, n, b)
+    count' _ _ _ = error "manipulateTerm: cannot manipulate terms that contain something other than applications, variables or lists."
     term' n = foldl1 GallinaApp (GallinaVar (invThm n) : map GallinaVar args)
     eqArgs = map (\n -> "_h" ++ show n) [0 .. arity - 1]
     args = ('x' : show arity) : eqArgs

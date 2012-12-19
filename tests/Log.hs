@@ -1,4 +1,4 @@
-{-# OPTIONS_Hs2Gallina bc: log #-}
+{-# OPTIONS_HsToGallina bc: log #-}
 
 module Log where
 

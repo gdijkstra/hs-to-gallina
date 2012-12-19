@@ -1,4 +1,4 @@
-{-# OPTIONS_Hs2Gallina bc: bcListTest #-}
+{-# OPTIONS_HsToGallina bc: bcListTest #-}
 
 module Notation where
 

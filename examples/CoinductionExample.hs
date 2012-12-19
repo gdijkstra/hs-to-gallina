@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_Hs2Gallina co: Stream trues #-}
+{-# OPTIONS_HsToGallina co: Stream trues #-}
 
 module CoinductionExample where
 

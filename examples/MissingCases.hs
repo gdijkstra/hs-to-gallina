@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_Hs2Gallina bc: missing0 missing1 hd recursive #-}
+{-# OPTIONS_HsToGallina bc: missing0 missing1 hd recursive #-}
 
 module MissingCases where
 

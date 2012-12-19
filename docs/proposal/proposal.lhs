@@ -91,7 +91,7 @@ With the ``bc'' pragma we can specify of which definitions we want to
 generate Bove-Capretta predicates:
 
 \begin{code}
-{-"\text{\{-\# OPTIONS\_Hs2Gallina bc: quicksort \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_HsToGallina bc: quicksort \#-\}}"-}
 
 ...
 
@@ -115,8 +115,8 @@ pragmas, we can indicate that we want a coinductive translation of our
 definitions.
 
 \begin{code}
-{-"\text{\{-\# OPTIONS\_Hs2Gallina codata: Stream \#-\}}"-}
-{-"\text{\{-\# OPTIONS\_Hs2Gallina cofix: zeroes  \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_HsToGallina codata: Stream \#-\}}"-}
+{-"\text{\{-\# OPTIONS\_HsToGallina cofix: zeroes  \#-\}}"-}
 
 ...
 
