@@ -4,11 +4,11 @@
 
 -- * Everything that has to do with classes.
 -- * Infix operators (.), (&&), (||), ($), (!!), (++)
--- * Tuple: type and data constructors, (un)curry, span, break, zip, zip3, zipWith, zipWith3, unzip, unzip3
+-- * Tuple: type and data constructors, (un)curry, span, break, zip, zip3, zipWith, zipWith3, unzip, unzip3, splitAt
 -- * seq, ($!)
 -- * Char, String.
 -- * IO
--- * Int and all other number stuff (because of classes).
+-- * Number stuff (because of classes).
 -- * lines, words, unlines, unwords (because of String).
 -- * lookup, elem, notElem (because of Eq class).
 -- * PreludeText/PreludeIO
@@ -153,9 +153,6 @@ drop                   :: Int -> [a] -> [a]
 drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
-
-splitAt                  :: Int -> [a] -> ([a],[a])
-splitAt n xs             =  (take n xs, drop n xs)
 
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile p []          =  []
