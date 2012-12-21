@@ -1,12 +1,14 @@
 #!/bin/bash
 
+# Run all the tests: convert Haskell file to Coq script. Compile Coq
+# script. Compile extracted Haskell code.
+
 pushd tests
 
 echo "Removing all temporary files."
 rm -f *.glob *.v *.vo extracted/*
 
-# Test stuff that should work.
-positiveTests="Log.hs Quicksort.hs Notation.hs Coinduction.hs Recursion.hs"
+positiveTests="PreludeTest.hs Log.hs Quicksort.hs Notation.hs Coinduction.hs Recursion.hs"
 success=0
 total=0
 
@@ -43,26 +45,5 @@ if (( $success == $total ))
 then exit 0
 else exit 1
 fi
-
-
-# Loop over files
-# Run Hs2Gallina
-# Run coqc
-# Run ghc
-# ghc -Wall -fno-warn-unrecognised-pragmas <haskell bestand>
-# Adjust counter if tests worked.
-# End loop
-
-# Print statistics.
-
-# Test stuff that should fail.
-
-# Loop over files
-# Run Hs2Gallina
-# Run coqc
-# Adjust counter if tests failed.
-# End loop
-
-# Print statistics.
 
 popd

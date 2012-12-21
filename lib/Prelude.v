@@ -43,7 +43,8 @@ Extract Inlined Constant otherwise => "Prelude.otherwise".
 Definition Maybe (a : Set) := option a.
 Definition Just := Some.
 Implicit Arguments None [].
-Definition Nothing := None.
+Definition Nothing {a : Set} := None a.
+Implicit Arguments Just [A].
 
 Definition maybe {a b : Set} (n : b) (f : a -> b) (m : Maybe a) : b :=
   match m with
@@ -325,4 +326,3 @@ Extract Inlined Constant last => "Prelude.last".
 Extract Inlined Constant init => "Prelude.init".
 Extract Inlined Constant foldr1 => "Prelude.foldr1".
 Extract Inlined Constant foldl1 => "Prelude.foldl1".
-

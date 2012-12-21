@@ -8,6 +8,7 @@ cabal-version: >= 1.2
 extra-source-files: Makefile
                     , README.md
                     , RunTests
+                    , lib/Prelude.v
                     , src/AG.ag
                     , src/AG/DataTypes.ag
                     , src/AG/Declarations.ag
@@ -23,8 +24,13 @@ extra-source-files: Makefile
                     , src/Gallina/PrettyPrinting.hs
                     , src/Gallina/Syntax.hs
                     , src/HsToGallina.hs
+                    , src/Coinduction.hs
+                    , tests/Coinduction.hs
                     , tests/Log.hs
+                    , tests/Notation.hs
+                    , tests/PreludeTest.hs
                     , tests/Quicksort.hs
+                    , tests/Recursion.hs
 
 executable HsToGallina
   main-is: HsToGallina.hs

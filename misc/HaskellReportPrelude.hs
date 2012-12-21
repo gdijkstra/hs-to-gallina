@@ -61,8 +61,6 @@ data  Ordering  =  LT | EQ | GT
 -- Lists
 data  [a]  =  [] | a : [a]
 
-infix  4  `elem`, `notElem`
-
 map :: (a -> b) -> [a] -> [b]
 map f []     = []
 map f (x:xs) = f x : map f xs
