@@ -5,24 +5,15 @@
 
 \usetheme{Copenhagen}
 \usecolortheme{dolphin}
-\defbeamertemplate*{title page}{customized}[1][]
-{
-  \begin{center}
-  \usebeamerfont{title}\inserttitle\par
-  \usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par
-  \usebeamerfont{author}\usebeamercolor[fg]{textnormal}\insertauthor\par
-  \bigskip
-  \usebeamerfont{institute}\insertinstitute\par
-  \usebeamerfont{date}\insertdate\par
-  \bigskip
-  \usebeamercolor[fg]{titlegraphic}\inserttitlegraphic
-\end{center}
-}
+\setbeamertemplate{navigation symbols}{} 
 
-\title{Translating Haskell programs to Coq programs}
-\author{Gabe Dijkstra}
-\institute[Dept. of CS @@ UU.nl]{Utrecht University Department of Computing Science}
-\date{\today}
+\title[Translating Haskell to Coq]{Translating Haskell programs to Coq programs}
+\institute[Utrecht University]{Department of Information and Computing
+  Sciences\\Faculty of Science, Utrecht University}
+
+\author[G. Dijkstra]{Gabe Dijkstra}
+
+\date{February 21st, 2013}
 
 \begin{document}
 
