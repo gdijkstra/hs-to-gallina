@@ -1,4 +1,3 @@
-\documentclass[usenames,svgnames,dvipsnames,table]{beamer}
 %include polycode.fmt
 
 \usepackage[T1]{fontenc}
@@ -20,10 +19,13 @@
 
 \begin{frame}
 \maketitle
+\note{Title page}
 \end{frame}
 
 \setcounter{tocdepth}{1}
+
 \begin{frame}
+\note{Useless table of contents that I will most likely remove at some points in the future.}
   \tableofcontents
 \end{frame}
 
@@ -31,6 +33,7 @@
 
 \begin{frame}
   \frametitle{Introduction}
+  \note{Introduce stuff here, obviously.}
   \begin{itemize}
     \item a
     \item b

@@ -1,10 +1,13 @@
-default : slides.pdf
+default : slides-slides.pdf slides-notes.pdf
 
-preview : slides.pdf
-	if [ `uname` = 'Darwin' ]; then open -a /Applications/Skim.app slides.pdf; fi
+preview : slides-slides.pdf slides-notes.pdf
+	if [ `uname` = 'Darwin' ]; then open -a /Applications/Skim.app slides-slides.pdf; fi
 
-slides.pdf : slides.tex
-	pdflatex -halt-on-error slides.tex && pdflatex slides.tex && pdflatex -synctex=1 slides.tex
+slides-notes.pdf : slides.tex slides-notes.tex
+	pdflatex -halt-on-error slides-notes.tex && pdflatex slides-notes.tex && pdflatex -synctex=1 slides-notes.tex
+
+slides-slides.pdf : slides.tex slides-slides.tex
+	pdflatex -halt-on-error slides-slides.tex && pdflatex slides-slides.tex && pdflatex -synctex=1 slides-slides.tex
 
 slides.tex : slides.lhs
 	lhs2TeX -o slides.tex slides.lhs

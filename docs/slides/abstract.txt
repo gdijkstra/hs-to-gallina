@@ -1,0 +1,9 @@
+Abstract
+
+Haskell programmers like to say that "well-typed programs do not go
+wrong". However, if our Haskell program type checks, it does not give
+us any guarantees about termination or that it actually computes the
+right thing, e.g. a function sort :: [Int] -> [Int] that type checks, need
+not return a sorted version of the input list. We present a tool that
+translates (a subset of) Haskell to Coq's specification language,
+Gallina.
