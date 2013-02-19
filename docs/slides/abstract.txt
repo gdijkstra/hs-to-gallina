@@ -3,7 +3,11 @@ Abstract
 Haskell programmers like to say that "well-typed programs do not go
 wrong". However, if our Haskell program type checks, it does not give
 us any guarantees about termination or that it actually computes the
-right thing, e.g. a function sort :: [Int] -> [Int] that type checks, need
-not return a sorted version of the input list. We present a tool that
-translates (a subset of) Haskell to Coq's specification language,
-Gallina.
+right thing, e.g. a function sort :: [Int] -> [Int] that type checks,
+need not return a sorted version of the input list. A way to verify
+the correctness is by using the proof assistant Coq to prove that the
+needed properties hold. In order to do this, we first need to
+translate our Haskell program to a Coq script. This is a rather
+tedious process and is prone to subtle mistakes. We present a tool
+that automates large parts of this translation from Haskell to Coq's
+specifiction language, Gallina.
