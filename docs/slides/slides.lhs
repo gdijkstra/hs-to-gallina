@@ -26,6 +26,17 @@
 
 \begin{frame}\frametitle{Motivation}
   \note{Motivate stuff here, obviously.}
+  \begin{itemize}
+  \item Suppose we have written a well-typed Haskell program
+  \item No guarantees on:
+    \begin{itemize}
+    \item termination
+    \item pattern match failures (in the presence of non-exhaustive patterns)
+    \end{itemize}
+  \item 
+
+  \end{itemize}
+
 \end{frame}
 
 \subsection{Coq introduction}
@@ -158,6 +169,22 @@ Fixpoint quicksort (x0 : List Nat) : List Nat :=
 Error:
 Recursive definition of quicksort is ill-formed.
 ...
+\end{verbatim}
+\end{frame}
+
+\begin{frame}\frametitle{Using the Bove-Capretta method}
+
+  \begin{itemize}
+  \item |headReverse x xs = head (reverse (x :: xs))| never crashes
+  \item We can use the \verb+refine+ tactic here.
+  \item The user has to provide proofs here.
+  \end{itemize}
+
+\begin{verbatim}
+  Definition headReverse {a : Set} (x: a) (xs : List a) : a.
+refine (head (reverse (x :: xs)) _).
+<proof omitted>
+Defined.
 \end{verbatim}
 \end{frame}
 
