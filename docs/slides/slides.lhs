@@ -2,7 +2,7 @@
 
 \usepackage[T1]{fontenc}
 
-\usetheme{Copenhagen}
+\usetheme{Madrid}
 \usecolortheme{dolphin}
 \setbeamertemplate{navigation symbols}{} 
 
@@ -154,7 +154,7 @@ Error: Non exhaustive pattern-matching: no clause found for pattern nil
     quicksort []        =  []
     quicksort (x : xs)  =  append
                            (quicksort (filter (gt x) xs))
-                          K (quicksort (filter (le x) xs))
+                           (quicksort (filter (le x) xs))
   \end{code}
 
 \begin{verbatim}
