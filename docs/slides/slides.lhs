@@ -5,6 +5,7 @@
 \usetheme{Madrid}
 \usecolortheme{dolphin}
 \setbeamertemplate{navigation symbols}{} 
+\usepackage{appendixnumberbeamer}
 
 \title[Translating Haskell to Coq]{Translating Haskell programs to Coq programs}
 \institute[Utrecht University]{Department of Information and Computing
@@ -19,22 +20,40 @@
 
 \begin{frame}
 \maketitle
-\note{|.| Title page}
+\note{Go slow!\vspace{3ex}\\}
+
+\note{|.| I'm going to talk about my experimentation project I did under the supervision of Wouter Swierstra\vspace{1ex}\\}
+
+\note{|.| which is about automatically translating Haskell programs to Coq programs\vspace{1ex}\\}
 \end{frame}
 
 \section{Motivation}
 
 \begin{frame}\frametitle{Motivation}
-  \note{|.| Motivate stuff here, obviously.}
+  \note{|.|  Suppose we have written a well-typed Haskell program\vspace{1ex}\\}
+  \note{|.|  Being well-typed gives us some guarantees, but doesn't say anything about\vspace{1ex}\\}
+  \note{|.|  termination\vspace{1ex}\\}
+  \note{|.|  pattern match failures\vspace{1ex}\\}
+  \note{|.|  sort example even though it type checks, its clearly not correct (except for the empty list)\vspace{1ex}\\}
+  \note{|.|  Haskell types are not very expressive\vspace{1ex}\\}
+  \note{|.| we cannot easily express in the type that the resulting
+    list is a sorted permutation of the input\vspace{1ex}\\}
+  \note{|.|  PAUSE catch phrase after the PAUSE\vspace{1ex}\\}
+  \note<2->{|.| We want to formally verify correctness of a Haskell program using Coq\vspace{1ex}\\}
+
   \begin{itemize}
   \item Suppose we have written a well-typed Haskell program
-  \item No guarantees on:
+  \item This gives us no guarantees on:
     \begin{itemize}
     \item termination
     \item pattern match failures (in the presence of non-exhaustive patterns)
     \end{itemize}
-  \item 
-
+  \item Correctness:
+    \begin{code}
+      sort :: [Int] -> [Int]
+      sort _ = []
+    \end{code}
+  \item<2-> We want to formally verify Haskell code using the proof assistant Coq
   \end{itemize}
 
 \end{frame}
@@ -42,40 +61,104 @@
 \subsection{Coq introduction}
 
 \begin{frame}\frametitle{Coq introduction}
-  \note{|.| Introduce Coq stuff here, obviously.}
+  \note{|.| Since some of you may not be familiar with Coq\vspace{1ex}\\}
+
+  \note{|.| I will give a very brief overview of the system\vspace{1ex}\\}
+
+  \note{|.| Coq is an interactive theorem prover\vspace{1ex}\\}
+  \note{|.| Built upon the principle : propositions as (dependent) types\vspace{1ex}\\}
+  \note{|.| In which: proofs as programs of the corresponding type\vspace{1ex}\\}
+  \note{|.| Proofs are written in Coq's specification language, Gallina \vspace{1ex}\\}
+  \note{|.| This is essentially a functional programming language\vspace{1ex}\\}
+  \note{|.| We can write these proofs directly in Gallina\vspace{1ex}\\}
+  \note{|.| ...or using tactics (which is not the focus of this presentation)\vspace{1ex}\\}
+  \note{|.| PAUSE extraction stuff after PAUSE\vspace{1ex}\\}
+  \note<2->{|.| from proofs we can extract the functional program to Haskell\vspace{1ex}\\}
+  \note<2->{|.| so we can use the verified code in a larger development\vspace{1ex}\\}
+
+  \begin{itemize}
+  \item Coq is an interactive theorem prover
+  \item Propositions as (dependent) types
+  \item Proofs as programs
+  \item Gallina is Coq's specification language 
+  \item Essentially a functional programming language
+  \item We can write proofs using Gallina directly
+  \item ...or interactively using tactics
+  \item<2-> Extraction
+  \end{itemize}
 \end{frame}
 
 \subsection{Goal}
 
 \begin{frame}\frametitle{Goal}
-  \note{|.| Ok, so we have a nice system to do verification in, but we
-    still need to translate everything to something Coq understands.}
+  \note{|.| Ok, so we have decided that we want to verify our Haskell
+    code using Coq.\vspace{1ex}\\}
+  
+  \note{|.| Before we can do this: we need to first translate
+    everything to Gallina \vspace{1ex}\\}
+
+  \note{|.| This is tedious and rather error-prone \vspace{1ex}\\}
+
+  \note{|.| It would be nice if we had a tool that did this \vspace{1ex}\\}
+
+  \note{|.| In such a way that the extracted code can replace the original \vspace{1ex}\\}
+
+  \note{|.| (This means that the types of the definitions in extracted
+    code need to be the same as the ones of the original
+    definitions.)\vspace{1ex}\\}
+
+  \note{|.| Of course, it's not realistic to think that we can support
+    all of HAskell right away\vspace{1ex}\\}
+
+  \note{|.| Restrict ourselves to Haskell 98 without type classes\vspace{1ex}\\}
+
+  \note{|.| single module with only implicit Prelude import \vspace{1ex}\\}
+
+  \note{|.| PAUSE for top-level definition type sig PAUSE \vspace{1ex}\\}
+
+  \note<2->{|.| assume every top-level definition has type sig \vspace{1ex}\\}
+
+  Translating Haskell code to Gallina by hand is tedious and prone to
+  subtle mistakes.
+
+  \begin{itemize}
+  \item We want to automate this process
+  \item Extracted code needs to be compatible with the original
+  \item Restrict ourselves to:
+    \begin{itemize}
+    \item Haskell 98 without type classes
+    \item Single Haskell module with only implicit Prelude import
+    \item No extensions
+    \end{itemize}
+  \item<2-> We assume that every top-level definition has a type signature 
+  \end{itemize}
+
 \end{frame}
 
 \section{Translating data types}
 
 \begin{frame}\frametitle{Translating data types}
-  \note{|.| Let's have a look at how we can translate Haskell data types\vspace{1.5ex}\\}
+  \note{|.| Let's have a look at how we can translate Haskell data types\vspace{1ex}\\}
   
-  \note{|.| List data type\vspace{1.5ex}\\}
+  \note{|.| List data type\vspace{1ex}\\}
 
-  \note{|.| With one type parameter\vspace{1.5ex}\\}
+  \note{|.| With one type parameter\vspace{1ex}\\}
 
-  \note{|.| Can be translated using the Inductive command.\vspace{1.5ex}\\}
+  \note{|.| Can be translated using the Inductive command.\vspace{1ex}\\}
 
-  \note{|.| Syntax that's similar to GADT syntax.\vspace{1.5ex}\\}
+  \note{|.| Syntax that's similar to GADT syntax.\vspace{1ex}\\}
 
-  \note{|.| Also notice that it's more explicit.\vspace{1.5ex}\\}
+  \note{|.| Also notice that it's more explicit.\vspace{1ex}\\}
 
-  \note{|.| We have to give the kind of the data type.\vspace{1.5ex}\\}
+  \note{|.| We have to give the kind of the data type.\vspace{1ex}\\}
 
-  \note{|.| We have to give the kind of the type parameters.\vspace{1.5ex}\\}
+  \note{|.| We have to give the kind of the type parameters.\vspace{1ex}\\}
 
-  \note{|.| PAUSE for assumption!\vspace{1.5ex}\\}
+  \note{|.| PAUSE for assumption!\vspace{1ex}\\}
 
-  \note<2->{|.| We assume every type parameter to have kind star.\vspace{1.5ex}\\}
+  \note<2->{|.| We assume every type parameter to have kind star.\vspace{1ex}\\}
 
-  \note<2->{|.| User has to change this manually if a type parameter has some other kind.\vspace{1.5ex}\\}
+  \note<2->{|.| User has to change this manually if a type parameter has some other kind.\vspace{1ex}\\}
 
   \begin{block}{Haskell code}
     \begin{code}
@@ -98,16 +181,16 @@ Inductive List ( a : Set ) : Set :=
 \section{Dealing with parametric polymorphism}
 
 \begin{frame}\frametitle{Dealing with parametric polymorphism}
-  \note{|.| Now that we know how to translate data types:\vspace{1.5ex}\\}
-  \note{|.| Let's have a look at function definitions.\vspace{1.5ex}\\}
-  \note{|.| Here we see a function |k| (better known as |const|), which is polymorphic.\vspace{1.5ex}\\}
-  \note{|.| Parametric polymorphism does not exist in Coq.\vspace{1.5ex}\\}
-  \note{|.| We solve this using implicit variables.\vspace{1.5ex}\\}
-  \note{|.| Curly braces indicate that |a| and |b| are implicit variables.\vspace{1.5ex}\\}
-  \note{|.| Need not be given when calling this function |k|.\vspace{1.5ex}\\}
-  \note{|.| Coq can infer which type parameter it needs to fill in at the call site.\vspace{1.5ex}\\}
-  \note{|.| PAUSE for type parameter has kind star assumption!\vspace{1.5ex}\\}
-  \note<2->{|.| Type parameter has kind star assumption!\vspace{1.5ex}\\}
+  \note{|.| Now that we know how to translate data types:\vspace{1ex}\\}
+  \note{|.| Let's have a look at function definitions.\vspace{1ex}\\}
+  \note{|.| Here we see a function |k| (better known as |const|), which is polymorphic.\vspace{1ex}\\}
+  \note{|.| Parametric polymorphism does not exist in Coq.\vspace{1ex}\\}
+  \note{|.| We solve this using implicit variables.\vspace{1ex}\\}
+  \note{|.| Curly braces indicate that |a| and |b| are implicit variables.\vspace{1ex}\\}
+  \note{|.| Need not be given when calling this function |k|.\vspace{1ex}\\}
+  \note{|.| Coq can infer which type parameter it needs to fill in at the call site.\vspace{1ex}\\}
+  \note{|.| PAUSE for type parameter has kind star assumption!\vspace{1ex}\\}
+  \note<2->{|.| Type parameter has kind star assumption!\vspace{1ex}\\}
 
   \begin{block}{Haskell code}
     \begin{code}
@@ -132,15 +215,15 @@ Definition k { a b : Set }
 \end{frame}
 
 \begin{frame}
-  \note{|.| One might ask the question whether this always works?\vspace{1.5ex}\\}
-  \note{|.| Let's look at the other well-known combinator, |s|\vspace{1.5ex}\\}
-  \note{|.| We know that the identity combinator, |i|, can be written as |s k k|\vspace{1.5ex}\\}
-  \note{|.| So let's try to translate this definition of the combinator |i|.\vspace{1.5ex}\\}
-  \note{|.| PAUSE for error!\vspace{1.5ex}\\}
-  \note<2->{|.| If we try to type check this, Coq will tell us that it cannot infer all type parameters.\vspace{1.5ex}\\}
-  \note<2->{|.| If we do the type inference by hand, we can see why.\vspace{1.5ex}\\}
-  \note<2->{|.| The type parameter Coq talks about is indeed left free.\vspace{1.5ex}\\}
-  \note<2->{|.| And if we look at the GHC-Core output, we see that GHC fills in |GHC.Prim.Any|.\vspace{1.5ex}\\}
+  \note{|.| One might ask the question whether this always works?\vspace{1ex}\\}
+  \note{|.| Let's look at the other well-known combinator, |s|\vspace{1ex}\\}
+  \note{|.| We know that the identity combinator, |i|, can be written as |s k k|\vspace{1ex}\\}
+  \note{|.| So let's try to translate this definition of the combinator |i|.\vspace{1ex}\\}
+  \note{|.| PAUSE for error!\vspace{1ex}\\}
+  \note<2->{|.| If we try to type check this, Coq will tell us that it cannot infer all type parameters.\vspace{1ex}\\}
+  \note<2->{|.| If we do the type inference by hand, we can see why.\vspace{1ex}\\}
+  \note<2->{|.| The type parameter Coq talks about is indeed left free.\vspace{1ex}\\}
+  \note<2->{|.| And if we look at the GHC-Core output, we see that GHC fills in |GHC.Prim.Any|.\vspace{1ex}\\}
 
   \begin{block}{Haskell code}
     \begin{code}
@@ -171,14 +254,14 @@ Error: Cannot infer the implicit parameter b of k.
 \section{Recursion and partiality}
 
 \begin{frame}\frametitle{Recursion and partiality}
-  \note{|.| In Coq every definition has to be total\vspace{1.5ex}\\}
-  \note{|.| It has to terminate\vspace{1.5ex}\\}
-  \note{|.| Its pattern matches have to be exhaustive\vspace{1.5ex}\\}
-  \note{|.| Non-terminating definitions can be used to prove anything\vspace{1.5ex}\\}
-  \note{|.| which would make the system inconsistent\vspace{1.5ex}\\}
-  \note{|.| Coq checks whether\vspace{1.5ex}\\}
-  \note{|.| Every recursive call is done on structurally smaller arguments\vspace{1.5ex}\\}
-  \note{|.| Every pattern match is exhaustive\vspace{1.5ex}\\}
+  \note{|.| In Coq every definition has to be total\vspace{1ex}\\}
+  \note{|.| It has to terminate\vspace{1ex}\\}
+  \note{|.| Its pattern matches have to be exhaustive\vspace{1ex}\\}
+  \note{|.| Non-terminating definitions can be used to prove anything\vspace{1ex}\\}
+  \note{|.| which would make the system inconsistent\vspace{1ex}\\}
+  \note{|.| Coq checks whether\vspace{1ex}\\}
+  \note{|.| Every recursive call is done on structurally smaller arguments\vspace{1ex}\\}
+  \note{|.| Every pattern match is exhaustive\vspace{1ex}\\}
 
   \begin{itemize}
   \item In Coq every definition has to be total
@@ -200,7 +283,7 @@ Error: Cannot infer the implicit parameter b of k.
 \end{frame}
 
 \begin{frame}\frametitle{Recursion and partiality (cont.d)}
-  \note{|.| Show that foldr fits these restrictions\vspace{1.5ex}\\}
+  \note{|.| Show that foldr fits these restrictions\vspace{1ex}\\}
 
   \begin{block}{Haskell code}
     \begin{code}
@@ -225,8 +308,8 @@ Fixpoint foldr { a b : Set }
 
 \subsection{Partiality: |head|}
 \begin{frame}\frametitle{Partiality: |head|}
-  \note{|.| If we try this then PAUSE\vspace{1.5ex}\\}
-  \note<2->{|.| Coq complains that the pattern match is non-exhaustive\vspace{1.5ex}\\}
+  \note{|.| If we try this then PAUSE\vspace{1ex}\\}
+  \note<2->{|.| Coq complains that the pattern match is non-exhaustive\vspace{1ex}\\}
 
   \begin{block}{Haskell code}
     \begin{code}
@@ -255,11 +338,11 @@ Error: Non exhaustive pattern-matching: no clause
 
 \subsection{Non-structural recursion: |quicksort|}
 \begin{frame}\frametitle{Non-structural recursion: |quicksort|}
-  \note{|.| If we try this then PAUSE\vspace{1.5ex}\\}
-  \note<2->{|.| Coq complains that the definition is ill-formed\vspace{1.5ex}\\}
-  \note<2->{|.| It does not fit the structural recursion pattern: \vspace{1.5ex}\\}
-  \note<2->{|.| recursive calls are not done on |xs| but on |filter| something |xs|: \vspace{1.5ex}\\}
-  \note<2->{|.| it cannot see that this structurally smaller than |(x : xs)|  \vspace{1.5ex}\\}
+  \note{|.| If we try this then PAUSE\vspace{1ex}\\}
+  \note<2->{|.| Coq complains that the definition is ill-formed\vspace{1ex}\\}
+  \note<2->{|.| It does not fit the structural recursion pattern: \vspace{1ex}\\}
+  \note<2->{|.| recursive calls are not done on |xs| but on |filter| something |xs|: \vspace{1ex}\\}
+  \note<2->{|.| it cannot see that this structurally smaller than |(x : xs)|  \vspace{1ex}\\}
 
   \begin{block}{Haskell code}
     \begin{code}
@@ -294,13 +377,13 @@ Error: Recursive definition of quicksort is ill-formed.
 \begin{frame}\frametitle{General recursion in Coq}
 
   \note{|.| Of course, embedding general recursion in Coq has been the
-    subject of study for many years now, so:\vspace{1.5ex}\\}
-  \note{|.| There are several ways to embed general recursion in Coq\vspace{1.5ex}\\}
-  \note{|.| We have the following requirements:\vspace{1.5ex}\\}
-  \note{|.| Needs to allow for non-exhaustive pattern matches\vspace{1.5ex}\\}
-  \note{|.| Extracted definitions have to have the same types as the original definitions\vspace{1.5ex}\\}
-  \note{|.| Bove-Capretta method meets all our requirements\vspace{1.5ex}\\}
-  \note{|.| which is why we chose to implement this method\vspace{1.5ex}\\}
+    subject of study for many years now, so:\vspace{1ex}\\}
+  \note{|.| There are several ways to embed general recursion in Coq\vspace{1ex}\\}
+  \note{|.| We have the following requirements:\vspace{1ex}\\}
+  \note{|.| Needs to allow for non-exhaustive pattern matches\vspace{1ex}\\}
+  \note{|.| Extracted definitions have to have the same types as the original definitions\vspace{1ex}\\}
+  \note{|.| Bove-Capretta method meets all our requirements\vspace{1ex}\\}
+  \note{|.| which is why we chose to implement this method\vspace{1ex}\\}
 
   \begin{itemize}
   \item There are several ways to embed general recursion in Coq
@@ -318,12 +401,12 @@ Error: Recursive definition of quicksort is ill-formed.
 \section{Bove-Capretta method}
 \begin{frame}\frametitle{Bove-Capretta method}
 
-  \note{|.| Generate a predicate from the function definition\vspace{1.5ex}\\}
-  \note{|.| Predicate is indexed by the arguments of the function\vspace{1.5ex}\\}
-  \note{|.| Proofs of the predicate encode call graph for that particular input\vspace{1.5ex}\\}
-  \note{|.| Structurally recurse on these proofs\vspace{1.5ex}\\}
-  \note{|.| Coq's totality checker ensures that we only construct finite call graphs\vspace{1.5ex}\\}
-  \note{|.| This will sound a bit vague right now, so let's take a look at some examples\vspace{1.5ex}\\}
+  \note{|.| Generate a predicate from the function definition\vspace{1ex}\\}
+  \note{|.| Predicate is indexed by the arguments of the function\vspace{1ex}\\}
+  \note{|.| Proofs of the predicate encode call graph for that particular input\vspace{1ex}\\}
+  \note{|.| Structurally recurse on these proofs\vspace{1ex}\\}
+  \note{|.| Coq's totality checker ensures that we only construct finite call graphs\vspace{1ex}\\}
+  \note{|.| This will sound a bit vague right now, so let's take a look at some examples\vspace{1ex}\\}
 
   \begin{itemize}
   \item Generate a predicate from the function definition
@@ -427,15 +510,15 @@ Fixpoint qs (x0 : List Nat) (x1 : qs_acc x0) : List Nat :=
 
 \subsection{Bove-Capretta method implementation}
 \begin{frame}\frametitle{Bove-Capretta method implementation}
-  \note{|.| As one can see, things get ugly really quickly\vspace{1.5ex}\\}
+  \note{|.| As one can see, things get ugly really quickly\vspace{1ex}\\}
   
-  \note{|.| Luckily, our tool automates all the boring, ugly parts\vspace{1.5ex}\\}
+  \note{|.| Luckily, our tool automates all the boring, ugly parts\vspace{1ex}\\}
 
-  \note{|.| In practice, when proving properties about the function:\vspace{1.5ex}\\}
+  \note{|.| In practice, when proving properties about the function:\vspace{1ex}\\}
 
   \note{|.| We only have to use the predicate, which looks a lot like
     the original function definition, possibly even
-    cleaner!\vspace{1.5ex}\\}
+    cleaner!\vspace{1ex}\\}
 
   Our tool can generate:
 
@@ -452,14 +535,14 @@ Fixpoint qs (x0 : List Nat) (x1 : qs_acc x0) : List Nat :=
 \section{Conclusion}
 
 \begin{frame}\frametitle{Conclusion}
-  \note{|.| Concluding this presentation, we have written a tool that:\vspace{1.5ex}\\}
-  \note{|.| Can translate a subset of Haskell 98 to Coq\vspace{1.5ex}\\}
-  \note{|.| Automates the ``boring parts'' of the Bove-Capretta method\vspace{1.5ex}\\}
-  \note{|.| (Not in this presentation:) has some support for the Prelude\vspace{1.5ex}\\}
-  \note{|.| (Not in this presentation:) supports infinite data structures using coinduction\vspace{1.5ex}\\}
-  \note{|.| For the curious: the code can be found on my GitHub \vspace{1.5ex}\\}
-  \note{|.| This concludes the presentation. Any questions? \vspace{1.5ex}\\}
-  \note{|.| WARNING WARNING Emergency slides after this!  \vspace{1.5ex}\\}
+  \note{|.| Concluding this presentation, we have written a tool that:\vspace{1ex}\\}
+  \note{|.| Can translate a subset of Haskell 98 to Coq\vspace{1ex}\\}
+  \note{|.| Automates the ``boring parts'' of the Bove-Capretta method\vspace{1ex}\\}
+  \note{|.| (Not in this presentation:) has some support for the Prelude\vspace{1ex}\\}
+  \note{|.| (Not in this presentation:) supports infinite data structures using coinduction\vspace{1ex}\\}
+  \note{|.| For the curious: the code can be found on my GitHub \vspace{1ex}\\}
+  \note{|.| This concludes the presentation. Any questions? \vspace{1ex}\\}
+  \note{|.| WARNING WARNING Emergency slides after this!  \vspace{1ex}\\}
 
   We have written a tool that:
 
@@ -474,14 +557,16 @@ Fixpoint qs (x0 : List Nat) (x1 : qs_acc x0) : List Nat :=
 \end{frame}
 
 % Backup slides!
+\appendix
+
 
 \subsection{Using the Bove-Capretta method}
 \begin{frame}\frametitle{Using the Bove-Capretta method}
-  \note{|.| Suppose we want to call a function defined using B-C method.\vspace{1.5ex}\\}
+  \note{|.| Suppose we want to call a function defined using B-C method.\vspace{1ex}\\}
 
-  \note{|.| User has to provide the proof of the predicate\vspace{1.5ex}\\}
+  \note{|.| User has to provide the proof of the predicate\vspace{1ex}\\}
 
-  \note{|.| refine tactic is really useful here\vspace{1.5ex}\\}
+  \note{|.| refine tactic is really useful here\vspace{1ex}\\}
 
   \begin{itemize}
   \item |headReverse x xs = head (reverse (x :: xs))| never crashes
