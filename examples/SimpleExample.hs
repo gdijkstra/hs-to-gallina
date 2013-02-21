@@ -49,3 +49,7 @@ one = Succ Zero
   
 id :: a -> a  
 id = \x -> x
+
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldr op e []      = e
+foldr op e (x:xs)  = op x (foldr op e xs)
