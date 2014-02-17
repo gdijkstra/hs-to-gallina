@@ -5,6 +5,10 @@
 
 pushd tests
 
+if [ ! -d "extracted" ]; then
+    mkdir "extracted"
+fi
+
 echo "Removing all temporary files."
 rm -f *.glob *.v *.vo extracted/*
 
@@ -24,7 +28,7 @@ do
         if [[ $? -eq 0 ]]
         then 
             echo "RunTests: coqc run succesfully" 
-            sed -i 's/unsafeCoerce :: a -> b//' extracted/$f
+            sed -i.bak -e's/unsafeCoerce :: a -> b//' extracted/$f
             ghc -fno-warn-deprecated-flags -c extracted/$f 
             if [[ $? -eq 0 ]]
             then
