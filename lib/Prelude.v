@@ -44,6 +44,9 @@ Inductive Maybe (a : Set) : Set :=
   | Just : a -> Maybe a
   | Nothing : Maybe a.
 
+Arguments Just {a} _.
+Arguments Nothing {a}.
+
 Definition maybe {a b : Set} (n : b) (f : a -> b) (m : Maybe a) : b :=
   match m with
     | Just x => f x
