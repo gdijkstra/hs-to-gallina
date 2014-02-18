@@ -37,7 +37,7 @@ executable HsToGallina
   ghc-options: -Wall
   build-depends: base
                  , uuagc
-                 , haskell-src-exts
+                 , haskell-src-exts < 1.14
                  , containers
                  , pretty
                  , filepath
